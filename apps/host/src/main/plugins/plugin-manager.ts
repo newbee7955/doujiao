@@ -111,6 +111,13 @@ export class PluginManager {
   }
 
   /**
+   * 获取指定插件的信息与清单
+   */
+  public getPlugin(pluginId: string): DiscoveredPlugin | undefined {
+    return this.listAllPlugins().find((p) => p.id === pluginId)
+  }
+
+  /**
    * 读取指定插件的 state.json
    */
   public getPluginState(pluginId: string): PluginState | null {

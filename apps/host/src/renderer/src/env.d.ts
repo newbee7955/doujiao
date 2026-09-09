@@ -6,6 +6,16 @@ export interface HostAPI {
   listPlugins: () => Promise<any[]>
   installPluginZip: () => Promise<{ success?: boolean; canceled?: boolean; pluginId?: string; version?: string; error?: string }>
   uninstallPlugin: (pluginId: string) => Promise<{ success: boolean }>
+
+  fetchMarketPlugins: (forceRefresh?: boolean) => Promise<any[]>
+  installMarketPlugin: (pluginId: string, version?: string) => Promise<{ success: boolean; pluginId?: string; version?: string; error?: string }>
+  checkPluginUpdates: () => Promise<any[]>
+  applyPluginUpdate: (pluginId: string, version?: string) => Promise<{ success: boolean; pluginId?: string; version?: string; error?: string }>
+
+  getFFmpegStatus: () => Promise<{ installed: boolean; version?: string; path?: string; source?: string; error?: string }>
+  installFFmpeg: () => Promise<{ success: boolean; status?: any; error?: string }>
+  selectFFmpegFile: () => Promise<{ success?: boolean; canceled?: boolean; status?: any; error?: string }>
+
   getDouyinStatus: () => Promise<{ loggedIn: boolean }>
   loginDouyin: () => Promise<{ success: boolean; message?: string }>
   listTasks: () => Promise<any[]>

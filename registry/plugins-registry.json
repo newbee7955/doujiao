@@ -1,0 +1,113 @@
+{
+  "schemaVersion": 2,
+  "registryVersion": 5,
+  "updatedAt": "2026-09-09T08:26:13.473Z",
+  "plugins": [
+    {
+      "id": "douyin-downloader",
+      "publisher": "doujiao-official",
+      "name": "抖音视频/合集下载器",
+      "description": "支持抖音单视频、主页作品、合集与专题批量下载，无水印解析",
+      "icon": "assets/icon.png",
+      "releases": [
+        {
+          "version": "1.2.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T08:26:13.285Z",
+          "changelog": "官方发布版本 v1.2.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "network.request",
+              "hosts": [
+                "www.douyin.com",
+                "*.douyinvod.com",
+                "*.amemv.com"
+              ],
+              "methods": [
+                "GET",
+                "POST"
+              ]
+            },
+            {
+              "capability": "download.enqueue"
+            },
+            {
+              "capability": "browser.login",
+              "domain": "douyin.com"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/douyin-downloader-v1.2.0/douyin-downloader-v1.2.0.zip",
+              "size": 59218,
+              "sha256": "63ec9b0033c69963f4b8e36d964e308f8d70ced3fafef6c3eb860842bdbd376d",
+              "signature": "WUofFTdUDluXOeTPhWtkFwviLj59o2MdII8yyN4WG3I0A95D853Kg912v/LGce6RzvTo2LOHOgPnnGpdfXNPBw=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bilibili-downloader",
+      "publisher": "doujiao-official",
+      "name": "B站视频/多P选集下载器",
+      "description": "支持 B 站高清视频解析、分P/连载选集批量提取，内置独立音视频流自动混流",
+      "icon": "assets/icon.png",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T08:26:13.473Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "network.request",
+              "hosts": [
+                "api.bilibili.com",
+                "www.bilibili.com",
+                "b23.tv",
+                "*.bilivideo.com",
+                "*.hdslb.com"
+              ],
+              "methods": [
+                "GET",
+                "POST"
+              ]
+            },
+            {
+              "capability": "download.enqueue",
+              "formats": [
+                "mp4",
+                "m4s",
+                "flv"
+              ]
+            },
+            {
+              "capability": "media.merge"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/bilibili-downloader-v1.0.0/bilibili-downloader-v1.0.0.zip",
+              "size": 55097,
+              "sha256": "949937618035712ccf99a665a4f17997681f29fcd95c065f3ed511cebbc709bd",
+              "signature": "t7KldEsWA1gfoAF71sJ5g0v/ZRdrlKU7KtMy2LSn6rYG0fErqazCzomQ/UygfxJviSGQuyqC+XkZJejTogMcDA=="
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

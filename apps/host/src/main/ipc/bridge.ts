@@ -128,14 +128,50 @@ export function registerPluginIpcBridge(): void {
     taskManager.openSaveDirectory()
   })
 
-  // 4. 监听下载进度（向当前沙箱转发本插件相关的任务进度）
+  // 5. 媒体处理：查询 FFmpeg 状态
+  ipcMain.handle('plugin:media:check-ffmpeg', async (event) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    const { FFmpegManager } = await import('../media/ffmpeg-manager')
+    return await FFmpegManager.getInstance().getStatus()
+  })
+
+  // 6. 媒体处理：受控音视频混流 (需要 media.merge 权限)
+  ipcMain.handle(
+    'plugin:media:merge',
+    async (
+      event,
+      options: { videoPath: string; audioPath: string; outputPath: string }
+    ) => {
+      const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+      if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+
+      const { PluginManager } = await import('../plugins/plugin-manager')
+      const plugin = PluginManager.getInstance().getPlugin(pluginId)
+      const hasPermission = plugin?.manifest?.permissions?.some(
+        (p: any) => p.capability === 'media.merge'
+      )
+      if (!hasPermission) {
+        throw new Error(
+          `[Security] 插件 ${pluginId} 未在 manifest.json 中声明 media.merge 权限，拒绝调用`
+        )
+      }
+
+      const { FFmpegManager } = await import('../media/ffmpeg-manager')
+      return await FFmpegManager.getInstance().mergeMedia(
+        options.videoPath,
+        options.audioPath,
+        options.outputPath
+      )
+    }
+  )
+
+  // 7. 监听下载进度（向当前沙箱转发本插件相关的任务进度）
   taskManager.subscribe((info) => {
     eventBroadcast(info)
   })
 
   function eventBroadcast(info: any) {
-    // 向所有活跃的插件 View 广播进度通知
-    // 实际生产中可按 pluginId 精确推送
     for (const [, instance] of (containerManager as any).views.entries()) {
       if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
         instance.view.webContents.send('plugin:download:progress', info)
@@ -143,3 +179,4 @@ export function registerPluginIpcBridge(): void {
     }
   }
 }
+

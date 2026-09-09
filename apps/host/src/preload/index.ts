@@ -9,6 +9,22 @@ const hostAPI = {
   installPluginZip: () => ipcRenderer.invoke('host:plugins:install-zip'),
   uninstallPlugin: (pluginId: string) => ipcRenderer.invoke('host:plugins:uninstall', pluginId),
 
+  // 市场与远端安装
+  fetchMarketPlugins: (forceRefresh?: boolean) =>
+    ipcRenderer.invoke('host:registry:fetch', forceRefresh),
+  installMarketPlugin: (pluginId: string, version?: string) =>
+    ipcRenderer.invoke('host:registry:install', { pluginId, version }),
+
+  // 自动更新与权限差异审计
+  checkPluginUpdates: () => ipcRenderer.invoke('host:updates:check'),
+  applyPluginUpdate: (pluginId: string, version?: string) =>
+    ipcRenderer.invoke('host:updates:apply', { pluginId, version }),
+
+  // 独立多媒体组件 FFmpeg 管理
+  getFFmpegStatus: () => ipcRenderer.invoke('host:ffmpeg:status'),
+  installFFmpeg: () => ipcRenderer.invoke('host:ffmpeg:install'),
+  selectFFmpegFile: () => ipcRenderer.invoke('host:ffmpeg:select-file'),
+
   // 抖音鉴权管理
   getDouyinStatus: () => ipcRenderer.invoke('host:auth:douyin-status'),
   loginDouyin: () => ipcRenderer.invoke('host:auth:douyin-login'),

@@ -78,6 +78,7 @@ export interface NetworkResponse<T = any> {
 
 export interface DownloadTaskRequest {
   url: string;
+  audioUrl?: string; // 可选的独立伴音流（音视频分离场景，宿主将自动使用 FFmpeg 执行无损混流）
   filename: string;
   headers?: Record<string, string>;
   extra?: {
@@ -134,6 +135,12 @@ export interface DoujiaoSDK {
   auth: {
     requestLogin(domain: string): Promise<{ success: boolean; message?: string }>;
     getStatus(domain: string): Promise<{ loggedIn: boolean; nickname?: string }>;
+  };
+
+  /** 媒体处理能力（FFmpeg 受控执行） */
+  media?: {
+    merge(options: { videoPath: string; audioPath: string; outputPath: string }): Promise<{ success: boolean; error?: string }>;
+    checkFFmpeg(): Promise<{ installed: boolean; version?: string; path?: string }>;
   };
 
   /** UI 交互与通知 */

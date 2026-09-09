@@ -1,9 +1,10 @@
 import { app, shell } from 'electron'
 import { join } from 'path'
-import { createWriteStream, existsSync, mkdirSync } from 'fs'
+import { createWriteStream, existsSync, mkdirSync, unlinkSync } from 'fs'
 import https from 'https'
 import http from 'http'
 import { URL } from 'url'
+import { FFmpegManager } from '../media/ffmpeg-manager'
 import type { DownloadTaskRequest, DownloadProgressInfo } from '@doujiao/plugin-sdk'
 
 export interface ManagedTask {
@@ -11,11 +12,12 @@ export interface ManagedTask {
   pluginId: string;
   filename: string;
   url: string;
+  audioUrl?: string;
   downloadedBytes: number;
   totalBytes: number;
   progress: number;
   speed: string;
-  status: 'pending' | 'downloading' | 'completed' | 'failed' | 'paused';
+  status: 'pending' | 'downloading' | 'merging' | 'completed' | 'failed' | 'paused';
   error?: string;
   abortController?: AbortController;
   savePath: string;
@@ -93,6 +95,7 @@ export class DownloadTaskManager {
       pluginId,
       filename: sanitizedFilename,
       url: taskReq.url,
+      audioUrl: taskReq.audioUrl,
       downloadedBytes: 0,
       totalBytes: 0,
       progress: 0,
@@ -128,13 +131,117 @@ export class DownloadTaskManager {
     return Array.from(this.tasks.values()).sort((a, b) => b.createdAt - a.createdAt)
   }
 
-  private startDownload(task: ManagedTask, customHeaders?: Record<string, string>): void {
+  private async startDownload(task: ManagedTask, customHeaders?: Record<string, string>): Promise<void> {
     task.status = 'downloading'
     task.abortController = new AbortController()
     this.notifyProgress(task)
 
+    // 场景 A：音视频分离流（DASH 格式），需下载双轨并由 FFmpeg 混流
+    if (task.audioUrl) {
+      const ffmpegManager = FFmpegManager.getInstance()
+      const ffmpegStatus = await ffmpegManager.getStatus()
+      if (!ffmpegStatus.installed) {
+        task.status = 'failed'
+        task.error = '检测到音视频分离流，但宿主未配置 FFmpeg。请在宿主设置中一键下载或手动导入 FFmpeg。'
+        this.notifyProgress(task)
+        return
+      }
+
+      const videoPart = `${task.savePath}.video.part`
+      const audioPart = `${task.savePath}.audio.part`
+
+      try {
+        let videoBytes = 0
+        let audioBytes = 0
+        let videoTotal = 0
+        let audioTotal = 0
+
+        // 1. 下载视频轨
+        await this.streamToFile(task.url, videoPart, customHeaders, task.abortController.signal, (downloaded, total, speed) => {
+          videoBytes = downloaded
+          videoTotal = total
+          task.downloadedBytes = videoBytes + audioBytes
+          task.totalBytes = (videoTotal + audioTotal) || total
+          task.progress = task.totalBytes > 0 ? Math.min(49, Math.round((task.downloadedBytes / task.totalBytes) * 50)) : 25
+          task.speed = `视频流: ${speed}`
+          this.notifyProgress(task)
+        })
+
+        // 2. 下载音频轨
+        await this.streamToFile(task.audioUrl, audioPart, customHeaders, task.abortController.signal, (downloaded, total, speed) => {
+          audioBytes = downloaded
+          audioTotal = total
+          task.downloadedBytes = videoBytes + audioBytes
+          task.totalBytes = videoTotal + audioTotal
+          task.progress = task.totalBytes > 0 ? Math.min(95, 50 + Math.round((audioBytes / audioTotal) * 45)) : 75
+          task.speed = `音频流: ${speed}`
+          this.notifyProgress(task)
+        })
+
+        // 3. FFmpeg 自动混流
+        task.status = 'merging'
+        task.speed = '音视频混流中...'
+        task.progress = 98
+        this.notifyProgress(task)
+
+        await ffmpegManager.mergeMedia(videoPart, audioPart, task.savePath)
+
+        // 清理分段文件
+        if (existsSync(videoPart)) unlinkSync(videoPart)
+        if (existsSync(audioPart)) unlinkSync(audioPart)
+
+        task.progress = 100
+        task.status = 'completed'
+        task.speed = '完成'
+        this.notifyProgress(task)
+        return
+      } catch (err: any) {
+        if (existsSync(videoPart)) {
+          try { unlinkSync(videoPart) } catch {}
+        }
+        if (existsSync(audioPart)) {
+          try { unlinkSync(audioPart) } catch {}
+        }
+        task.status = 'failed'
+        task.error = task.abortController.signal.aborted ? '已取消下载' : (err?.message || '音视频合成下载失败')
+        this.notifyProgress(task)
+        return
+      }
+    }
+
+    // 场景 B：单流直接下载
     try {
-      const parsedUrl = new URL(task.url)
+      await this.streamToFile(task.url, task.savePath, customHeaders, task.abortController.signal, (downloaded, total, speed) => {
+        task.downloadedBytes = downloaded
+        task.totalBytes = total
+        task.progress = total > 0 ? Math.min(99, Math.round((downloaded / total) * 100)) : 50
+        task.speed = speed
+        this.notifyProgress(task)
+      })
+
+      task.progress = 100
+      task.status = 'completed'
+      task.speed = '完成'
+      this.notifyProgress(task)
+    } catch (err: any) {
+      task.status = 'failed'
+      task.error = task.abortController.signal.aborted ? '已取消下载' : (err?.message || '下载失败')
+      this.notifyProgress(task)
+    }
+  }
+
+  /**
+   * 通用流式网络写入底层实现
+   */
+  private streamToFile(
+    url: string,
+    destPath: string,
+    customHeaders?: Record<string, string>,
+    abortSignal?: AbortSignal,
+    onProgress?: (downloaded: number, total: number, speed: string) => void
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const parsedUrl = new URL(url)
       const isHttps = parsedUrl.protocol === 'https:'
       const requestModule = isHttps ? https : http
 
@@ -145,56 +252,46 @@ export class DownloadTaskManager {
       }
 
       const req = requestModule.get(
-        task.url,
+        url,
         {
           headers,
-          signal: task.abortController.signal
+          signal: abortSignal
         },
         (res) => {
-          // 处理 301/302 重定向
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            task.url = res.headers.location
-            this.startDownload(task, customHeaders)
-            return
+            return this.streamToFile(res.headers.location, destPath, customHeaders, abortSignal, onProgress)
+              .then(resolve)
+              .catch(reject)
           }
 
           if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
-            task.status = 'failed'
-            task.error = `HTTP 状态异常: ${res.statusCode}`
-            this.notifyProgress(task)
-            return
+            return reject(new Error(`HTTP 状态异常: ${res.statusCode}`))
           }
 
           const contentLength = res.headers['content-length']
-          task.totalBytes = contentLength ? parseInt(contentLength, 10) : 0
+          const total = contentLength ? parseInt(contentLength, 10) : 0
 
-          const fileStream = createWriteStream(task.savePath)
+          const fileStream = createWriteStream(destPath)
+          let downloaded = 0
           let lastBytes = 0
           let lastTime = Date.now()
 
           res.on('data', (chunk: Buffer) => {
-            task.downloadedBytes += chunk.length
+            downloaded += chunk.length
 
             const now = Date.now()
-            if (now - lastTime >= 500) {
-              const deltaBytes = task.downloadedBytes - lastBytes
+            if (now - lastTime >= 400) {
+              const deltaBytes = downloaded - lastBytes
               const deltaTime = (now - lastTime) / 1000
               const bytesPerSec = deltaBytes / deltaTime
-              task.speed =
+              const speed =
                 bytesPerSec > 1024 * 1024
                   ? `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`
                   : `${(bytesPerSec / 1024).toFixed(0)} KB/s`
 
-              if (task.totalBytes > 0) {
-                task.progress = Math.min(
-                  99,
-                  Math.round((task.downloadedBytes / task.totalBytes) * 100)
-                )
-              }
-
-              lastBytes = task.downloadedBytes
+              lastBytes = downloaded
               lastTime = now
-              this.notifyProgress(task)
+              if (onProgress) onProgress(downloaded, total, speed)
             }
           })
 
@@ -202,34 +299,14 @@ export class DownloadTaskManager {
 
           fileStream.on('finish', () => {
             fileStream.close()
-            task.progress = 100
-            task.status = 'completed'
-            task.speed = '完成'
-            this.notifyProgress(task)
+            resolve()
           })
 
-          fileStream.on('error', (err) => {
-            task.status = 'failed'
-            task.error = err.message
-            this.notifyProgress(task)
-          })
+          fileStream.on('error', reject)
         }
       )
 
-      req.on('error', (err: any) => {
-        if (task.abortController?.signal.aborted) {
-          task.status = 'failed'
-          task.error = '下载已取消'
-        } else {
-          task.status = 'failed'
-          task.error = err.message
-        }
-        this.notifyProgress(task)
-      })
-    } catch (err: any) {
-      task.status = 'failed'
-      task.error = err?.message || '初始化请求失败'
-      this.notifyProgress(task)
-    }
+      req.on('error', reject)
+    })
   }
 }

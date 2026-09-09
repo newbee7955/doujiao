@@ -56,6 +56,15 @@ const sdk: DoujiaoSDK = {
     }
   },
 
+  media: {
+    merge: (options: { videoPath: string; audioPath: string; outputPath: string }) => {
+      return ipcRenderer.invoke('plugin:media:merge', options)
+    },
+    checkFFmpeg: () => {
+      return ipcRenderer.invoke('plugin:media:check-ffmpeg')
+    }
+  },
+
   ui: {
     notify: (options) => {
       console.log(`[PluginToast] [${options.type || 'info'}] ${options.message}`)

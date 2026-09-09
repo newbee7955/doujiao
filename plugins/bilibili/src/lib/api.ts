@@ -1,0 +1,127 @@
+import { getSDK } from '@doujiao/plugin-sdk'
+import type { BiliVideoInfo, BiliStreamResult } from '../types'
+import { extractBiliId } from './parser'
+
+const DEFAULT_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+  'Referer': 'https://www.bilibili.com/'
+}
+
+/**
+ * 还原 b23.tv 短链接为真实 BV 号
+ */
+export async function resolveBiliShortLink(shortUrl: string): Promise<string | null> {
+  const sdk = getSDK()
+  try {
+    const res = await sdk.network.request<string>({
+      url: shortUrl,
+      method: 'GET',
+      headers: DEFAULT_HEADERS
+    })
+
+    // 检查响应头或页面 HTML 中的真实目标地址
+    const loc = res.headers['location'] || res.headers['Location']
+    if (loc) {
+      const match = loc.match(/(BV[a-zA-Z0-9]{10})/i)
+      if (match) return match[1]
+    }
+
+    if (typeof res.data === 'string') {
+      const match = res.data.match(/(BV[a-zA-Z0-9]{10})/i)
+      if (match) return match[1]
+    }
+  } catch (err) {
+    console.warn('[BiliApi] 解析短链失败:', err)
+  }
+  return null
+}
+
+/**
+ * 获取 B 站视频核心元数据与全部分 P 列表
+ */
+export async function getVideoDetail(bvid: string): Promise<BiliVideoInfo> {
+  const sdk = getSDK()
+  const apiUrl = `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`
+
+  const res = await sdk.network.request<any>({
+    url: apiUrl,
+    method: 'GET',
+    headers: DEFAULT_HEADERS
+  })
+
+  if (res.data?.code !== 0 || !res.data?.data) {
+    throw new Error(res.data?.message || '获取视频信息失败，可能触发风控或视频已下架')
+  }
+
+  const d = res.data.data
+  return {
+    bvid: d.bvid,
+    aid: d.aid,
+    title: d.title,
+    desc: d.desc,
+    pic: d.pic,
+    duration: d.duration,
+    owner: {
+      mid: d.owner?.mid,
+      name: d.owner?.name,
+      face: d.owner?.face
+    },
+    pages: (d.pages || []).map((p: any) => ({
+      cid: p.cid,
+      page: p.page,
+      part: p.part || `第 ${p.page} 集`,
+      duration: p.duration,
+      selected: true
+    }))
+  }
+}
+
+/**
+ * 获取指定分 P 的无损音视频流播放地址
+ * 优先提取 DASH 格式中的独立音频流与最高码率视频流
+ */
+export async function getPlayStream(bvid: string, cid: number, qn = 80): Promise<BiliStreamResult> {
+  const sdk = getSDK()
+  const apiUrl = `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&qn=${qn}&fnval=16&fourk=1`
+
+  const res = await sdk.network.request<any>({
+    url: apiUrl,
+    method: 'GET',
+    headers: DEFAULT_HEADERS
+  })
+
+  if (res.data?.code !== 0 || !res.data?.data) {
+    throw new Error(res.data?.message || '获取视频流地址失败')
+  }
+
+  const data = res.data.data
+
+  // 1. DASH 现代音视频分离流格式 (DASH)
+  if (data.dash) {
+    const video = data.dash.video?.[0]
+    const audio = data.dash.audio?.[0]
+
+    const videoUrl = video?.baseUrl || video?.backupUrl?.[0]
+    const audioUrl = audio?.baseUrl || audio?.backupUrl?.[0]
+
+    if (videoUrl) {
+      return {
+        quality: video.id || data.quality,
+        videoUrl,
+        audioUrl
+      }
+    }
+  }
+
+  // 2. DURL 传统单流格式
+  if (data.durl && data.durl.length > 0) {
+    const stream = data.durl[0]
+    return {
+      quality: data.quality,
+      videoUrl: stream.url
+    }
+  }
+
+  throw new Error('未获取到可用的视频流地址')
+}
