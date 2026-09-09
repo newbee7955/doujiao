@@ -206,15 +206,29 @@ export default function App(): JSX.Element {
   // 拖拽文件进入
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     setIsDragging(false)
     if (!sdk?.lan) return
 
     const files = Array.from(e.dataTransfer.files)
-    const paths = files.map((f: any) => f.path).filter(Boolean)
+    const paths: string[] = []
+    for (const f of files) {
+      let p = ''
+      if (typeof sdk.getPathForFile === 'function') {
+        p = sdk.getPathForFile(f)
+      }
+      if (!p && (f as any).path) {
+        p = (f as any).path
+      }
+      if (p) paths.push(p)
+    }
+
     if (paths.length > 0) {
       const added = await sdk.lan.addShareFiles(paths)
       setSharedFiles((prev) => [...prev, ...added])
-      showToast(`已拖入添加 ${added.length} 个共享文件`)
+      showToast(`已成功添加 ${added.length} 个文件待发送至手机`)
+    } else {
+      showToast('未检测到有效的文件路径，请重试')
     }
   }
 
@@ -692,14 +706,20 @@ export default function App(): JSX.Element {
                 <div
                   onDragOver={(e) => {
                     e.preventDefault()
+                    e.stopPropagation()
+                    e.dataTransfer.dropEffect = 'copy'
                     setIsDragging(true)
                   }}
-                  onDragLeave={() => setIsDragging(false)}
+                  onDragLeave={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsDragging(false)
+                  }}
                   onDrop={handleDrop}
                   className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer mb-6 ${
                     isDragging
-                      ? 'border-sky-400 bg-sky-500/10'
-                      : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'
+                      ? 'border-sky-400 bg-sky-500/20 scale-[1.01] shadow-lg shadow-sky-500/10'
+                      : 'border-slate-800 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/60'
                   }`}
                   onClick={handleSelectFilesToSend}
                 >

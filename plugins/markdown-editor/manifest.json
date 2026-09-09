@@ -3,8 +3,8 @@
   "id": "markdown-editor",
   "publisher": "doujiao-official",
   "name": "Markdown 编辑器",
-  "version": "1.0.0",
-  "description": "支持双栏实时高亮预览、快捷语法工具栏、多文档本地管理及 Markdown 文件导入导出的沉浸式写作工具",
+  "version": "1.1.0",
+  "description": "支持双栏实时高亮预览、快捷语法工具栏、外部安全工作目录持久化存储（应用卸载不丢失）及 Markdown 导入导出",
   "icon": "📝",
   "engines": {
     "doujiao": ">=0.2.0 <0.3.0",
@@ -13,5 +13,7 @@
   "entrypoints": {
     "ui": "dist/index.html"
   },
-  "permissions": []
+  "permissions": [
+    { "capability": "workspace" }
+  ]
 }

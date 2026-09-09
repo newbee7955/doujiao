@@ -1,10 +1,11 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type {
   DoujiaoSDK,
   NetworkRequestOptions,
   DownloadTaskRequest,
   DownloadProgressInfo,
-  PluginLifecycle
+  PluginLifecycle,
+  WorkspaceFileItem
 } from '@doujiao/plugin-sdk'
 
 let registeredLifecycle: PluginLifecycle | null = null
@@ -18,6 +19,35 @@ const currentPluginId =
 const sdk: DoujiaoSDK = {
   version: '2.0.0',
   pluginId: currentPluginId,
+
+  getPathForFile: (file: File) => {
+    try {
+      if (webUtils && typeof webUtils.getPathForFile === 'function') {
+        return webUtils.getPathForFile(file)
+      }
+    } catch {}
+    return (file as any)?.path || ''
+  },
+
+  workspace: {
+    getDirectory: (scope?: string) => ipcRenderer.invoke('plugin:workspace:get-directory', scope),
+    setDirectory: (directory: string, scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:set-directory', directory, scope),
+    selectDirectory: (defaultPath?: string) =>
+      ipcRenderer.invoke('plugin:workspace:select-directory', defaultPath),
+    listFiles: (scope?: string, extensions?: string[]) =>
+      ipcRenderer.invoke('plugin:workspace:list-files', scope, extensions),
+    readFile: (relativePath: string, scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:read-file', relativePath, scope),
+    writeFile: (relativePath: string, content: string, scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:write-file', relativePath, content, scope),
+    deleteFile: (relativePath: string, scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:delete-file', relativePath, scope),
+    renameFile: (oldName: string, newName: string, scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:rename-file', oldName, newName, scope),
+    openDirectory: (scope?: string) =>
+      ipcRenderer.invoke('plugin:workspace:open-directory', scope)
+  },
 
   network: {
     request: <T = any>(options: NetworkRequestOptions) => {

@@ -236,12 +236,36 @@ export interface LanTransferEvent {
   payload: any;
 }
 
+export interface WorkspaceFileItem {
+  name: string;
+  relativePath: string;
+  size: number;
+  updatedAt: number;
+  isDirectory?: boolean;
+}
+
 /**
  * 宿主向沙箱环境注入的 SDK 核心门面
  */
 export interface DoujiaoSDK {
   readonly version: string;
   readonly pluginId: string;
+
+  /** 获取拖拽 File 对象的本地绝对路径 (兼容 Electron 33+ 安全策略) */
+  getPathForFile?(file: File): string;
+
+  /** 本地工作目录与持久化文件管理 (独立于应用，卸载不丢失) */
+  workspace?: {
+    getDirectory(scope?: string): Promise<string>;
+    setDirectory(directory: string, scope?: string): Promise<string>;
+    selectDirectory(defaultPath?: string): Promise<{ canceled: boolean; directoryPath?: string }>;
+    listFiles(scope?: string, extensions?: string[]): Promise<WorkspaceFileItem[]>;
+    readFile(relativePath: string, scope?: string): Promise<string>;
+    writeFile(relativePath: string, content: string, scope?: string): Promise<{ success: boolean; filePath: string }>;
+    deleteFile(relativePath: string, scope?: string): Promise<boolean>;
+    renameFile(oldName: string, newName: string, scope?: string): Promise<boolean>;
+    openDirectory(scope?: string): Promise<void>;
+  };
 
   /** 网络请求代理（受控附加 Cookie 与安全 Header） */
   network: {

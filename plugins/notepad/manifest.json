@@ -3,8 +3,8 @@
   "id": "notepad",
   "publisher": "doujiao-official",
   "name": "轻便记事本",
-  "version": "1.0.0",
-  "description": "零负担极速纯文本随手记，支持多便签卡片、置顶备忘、字数统计与自动持久化",
+  "version": "1.1.0",
+  "description": "零负担极速纯文本随手记，支持外部安全工作目录持久化存储（应用卸载不丢失）、多便签卡片、置顶备忘与字数统计",
   "icon": "🗒️",
   "engines": {
     "doujiao": ">=0.2.0 <0.3.0",
@@ -13,5 +13,7 @@
   "entrypoints": {
     "ui": "dist/index.html"
   },
-  "permissions": []
+  "permissions": [
+    { "capability": "workspace" }
+  ]
 }

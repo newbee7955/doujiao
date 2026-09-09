@@ -477,7 +477,7 @@ export default function App(): JSX.Element {
         style={{ WebkitAppRegion: 'drag' } as any}
       >
         <div className="flex items-center gap-2.5">
-          <img src={appIcon} alt="Logo" className="w-6 h-6 rounded-md shadow-sm object-contain flex-shrink-0" />
+          <img src={appIcon} alt="Logo" className="w-6 h-6 object-contain flex-shrink-0 select-none drop-shadow-sm" />
           <span className="font-bold text-sm tracking-wide bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
             豆角工具箱 Doujiao
           </span>

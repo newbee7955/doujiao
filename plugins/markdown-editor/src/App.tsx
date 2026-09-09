@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { getSDK } from '@doujiao/plugin-sdk'
 import { renderMarkdown } from './lib/markdown'
 
 interface MarkdownDoc {
@@ -6,6 +7,7 @@ interface MarkdownDoc {
   title: string
   content: string
   updatedAt: number
+  fileName?: string
 }
 
 const DEFAULT_DOCS: MarkdownDoc[] = [
@@ -72,13 +74,78 @@ export default function App(): JSX.Element {
   const [viewMode, setViewMode] = useState<'split' | 'edit' | 'preview'>('split')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [toast, setToast] = useState<string | null>(null)
+  const [workspaceDir, setWorkspaceDir] = useState<string>('')
+  const [isDiskSaving, setIsDiskSaving] = useState(false)
 
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const activeDoc = docs.find((d) => d.id === activeDocId) || docs[0]
 
-  // 本地持久化保存
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  // 1. 初始化加载工作目录与磁盘物理文件
+  const loadWorkspace = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        const dir = await sdk.workspace.getDirectory('markdown-editor')
+        setWorkspaceDir(dir)
+        const files = await sdk.workspace.listFiles('markdown-editor', ['.md', '.markdown'])
+        if (files.length === 0) {
+          // 首次启动，若本地缓存有旧笔记或默认文档，自动无损平滑迁移写入磁盘
+          const initialDocs = docs.length > 0 ? docs : DEFAULT_DOCS
+          for (const d of initialDocs) {
+            const fName = `${(d.title || '未命名文档').replace(/[\\/:*?"<>|]/g, '_')}.md`
+            await sdk.workspace.writeFile(fName, d.content, 'markdown-editor')
+          }
+          const refreshed = await sdk.workspace.listFiles('markdown-editor', ['.md', '.markdown'])
+          const loaded: MarkdownDoc[] = []
+          for (const f of refreshed) {
+            const content = await sdk.workspace.readFile(f.relativePath, 'markdown-editor')
+            loaded.push({
+              id: f.relativePath,
+              fileName: f.relativePath,
+              title: f.name.replace(/\.(md|markdown)$/i, ''),
+              content,
+              updatedAt: f.updatedAt
+            })
+          }
+          if (loaded.length > 0) {
+            setDocs(loaded)
+            setActiveDocId(loaded[0].id)
+          }
+        } else {
+          const loaded: MarkdownDoc[] = []
+          for (const f of files) {
+            const content = await sdk.workspace.readFile(f.relativePath, 'markdown-editor')
+            loaded.push({
+              id: f.relativePath,
+              fileName: f.relativePath,
+              title: f.name.replace(/\.(md|markdown)$/i, ''),
+              content,
+              updatedAt: f.updatedAt
+            })
+          }
+          if (loaded.length > 0) {
+            setDocs(loaded)
+            setActiveDocId(loaded[0].id)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[MarkdownEditor] 读取工作目录失败，降级为本地缓存模式:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadWorkspace()
+  }, [])
+
+  // 2. 双重持久化：实时备份到本地缓存
   useEffect(() => {
     try {
       localStorage.setItem('doujiao_markdown_docs', JSON.stringify(docs))
@@ -87,9 +154,54 @@ export default function App(): JSX.Element {
     }
   }, [docs])
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+  // 3. 防抖自动写入外部物理文件
+  useEffect(() => {
+    if (!activeDoc) return
+    const timer = setTimeout(async () => {
+      try {
+        const sdk = getSDK()
+        if (sdk?.workspace) {
+          const targetName = activeDoc.fileName || `${(activeDoc.title || '文档').replace(/[\\/:*?"<>|]/g, '_')}.md`
+          setIsDiskSaving(true)
+          await sdk.workspace.writeFile(targetName, activeDoc.content, 'markdown-editor')
+          setIsDiskSaving(false)
+        }
+      } catch (err) {
+        setIsDiskSaving(false)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [activeDoc?.content])
+
+  // 更换工作目录
+  const handleSelectWorkspaceDir = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        const res = await sdk.workspace.selectDirectory(workspaceDir)
+        if (!res.canceled && res.directoryPath) {
+          await sdk.workspace.setDirectory(res.directoryPath, 'markdown-editor')
+          setWorkspaceDir(res.directoryPath)
+          showToast('工作目录已切换')
+          await loadWorkspace()
+        }
+      }
+    } catch (err) {
+      console.error('切换工作目录失败:', err)
+      showToast('切换工作目录失败')
+    }
+  }
+
+  // 打开工作目录
+  const handleOpenWorkspaceDir = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        await sdk.workspace.openDirectory('markdown-editor')
+      }
+    } catch (err) {
+      console.error('打开目录失败:', err)
+    }
   }
 
   // 更新当前活动文档内容
@@ -99,39 +211,89 @@ export default function App(): JSX.Element {
     )
   }
 
-  // 更新标题
-  const updateTitle = (title: string) => {
+  // 更新标题并重命名磁盘文件
+  const updateTitle = async (title: string) => {
+    const safeTitle = title.trim() || '未命名文档'
+    const newFileName = `${safeTitle.replace(/[\\/:*?"<>|]/g, '_')}.md`
+    const oldFileName = activeDoc.fileName
+
+    if (oldFileName && oldFileName !== newFileName) {
+      try {
+        const sdk = getSDK()
+        if (sdk?.workspace) {
+          await sdk.workspace.renameFile(oldFileName, newFileName, 'markdown-editor')
+        }
+      } catch (err) {
+        console.warn('重命名文件失败:', err)
+      }
+    }
+
     setDocs((prev) =>
-      prev.map((d) => (d.id === activeDoc.id ? { ...d, title, updatedAt: Date.now() } : d))
+      prev.map((d) =>
+        d.id === activeDoc.id
+          ? { ...d, title, fileName: newFileName, id: newFileName, updatedAt: Date.now() }
+          : d
+      )
     )
+    if (activeDocId === activeDoc.id) {
+      setActiveDocId(newFileName)
+    }
   }
 
   // 新建文档
-  const handleNewDoc = () => {
+  const handleNewDoc = async () => {
+    let baseName = '未命名文档'
+    let title = baseName
+    let counter = 1
+    while (docs.some((d) => d.title === title)) {
+      title = `${baseName}_${counter++}`
+    }
+    const fileName = `${title}.md`
+    const defaultContent = `# ${title}\n\n在此开始输入内容...`
+
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        await sdk.workspace.writeFile(fileName, defaultContent, 'markdown-editor')
+      }
+    } catch {}
+
     const newDoc: MarkdownDoc = {
-      id: `doc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      title: '未命名文档',
-      content: '# 新文档\n\n在此开始输入内容...',
+      id: fileName,
+      fileName,
+      title,
+      content: defaultContent,
       updatedAt: Date.now()
     }
     setDocs((prev) => [newDoc, ...prev])
     setActiveDocId(newDoc.id)
-    showToast('已新建空白文档')
+    showToast(`已在工作目录下新建: ${fileName}`)
   }
 
   // 删除文档
-  const handleDeleteDoc = (id: string, e: React.MouseEvent) => {
+  const handleDeleteDoc = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (docs.length <= 1) {
       showToast('请至少保留一个文档')
       return
+    }
+    const docToDelete = docs.find((d) => d.id === id)
+    if (docToDelete?.fileName) {
+      try {
+        const sdk = getSDK()
+        if (sdk?.workspace) {
+          await sdk.workspace.deleteFile(docToDelete.fileName, 'markdown-editor')
+        }
+      } catch (err) {
+        console.warn('删除物理文件失败:', err)
+      }
     }
     const filtered = docs.filter((d) => d.id !== id)
     setDocs(filtered)
     if (activeDocId === id) {
       setActiveDocId(filtered[0].id)
     }
-    showToast('文档已删除')
+    showToast('文档已从工作目录删除')
   }
 
   // 工具栏插入语法
@@ -248,6 +410,40 @@ export default function App(): JSX.Element {
           </button>
         </div>
 
+        {/* 工作目录卡片 (独立外部存储，卸载不丢失) */}
+        <div className="p-2.5 bg-slate-900/40 border-b border-slate-800/60">
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <span className="font-medium text-slate-300 flex items-center gap-1">
+              <span>📁</span>
+              <span>工作目录</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">卸载不丢失</span>
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleOpenWorkspaceDir}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-indigo-400 hover:text-indigo-300 text-[10px] transition-colors"
+                title="在 Windows 资源管理器中打开当前工作文件夹"
+              >
+                📂 打开
+              </button>
+              <button
+                onClick={handleSelectWorkspaceDir}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] transition-colors"
+                title="更换工作存储文件夹"
+              >
+                🔄 切换
+              </button>
+            </div>
+          </div>
+          <div
+            className="text-[10px] font-mono text-slate-400 truncate bg-slate-950/80 px-2 py-1 rounded border border-slate-800/60 cursor-pointer hover:border-slate-700 hover:text-slate-300 transition-colors"
+            onClick={handleOpenWorkspaceDir}
+            title={workspaceDir || '默认安全目录：系统用户「文档/Doujiao/Markdown」'}
+          >
+            {workspaceDir ? workspaceDir : '系统用户「文档/Doujiao/Markdown」'}
+          </div>
+        </div>
+
         {/* 文档列表 */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           {docs.map((doc) => {
@@ -315,6 +511,17 @@ export default function App(): JSX.Element {
               className="bg-transparent text-sm font-semibold text-white border-b border-transparent hover:border-slate-700 focus:border-indigo-500 focus:outline-none px-1.5 py-0.5 max-w-sm truncate"
               placeholder="请输入文档标题..."
             />
+            {isDiskSaving ? (
+              <span className="text-[10px] text-amber-400 flex items-center gap-1 font-mono">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                写入中...
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono" title="已自动实时保存至外部磁盘文件">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                已存盘
+              </span>
+            )}
           </div>
 
           {/* 视图切换按钮 */}

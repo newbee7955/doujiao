@@ -32,32 +32,51 @@ export default function App(): JSX.Element {
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
 
+    const fetchLatest = () => {
+      try {
+        const sdk = getSDK()
+        if (sdk.clipboard) {
+          sdk.clipboard
+            .getHistory()
+            .then((history) => {
+              setItems(history || [])
+              setLoading(false)
+            })
+            .catch((err) => {
+              console.warn('[ClipboardHistory] 获取剪贴板历史失败:', err)
+              setLoading(false)
+            })
+        } else {
+          setLoading(false)
+        }
+      } catch {
+        setLoading(false)
+      }
+    }
+
+    fetchLatest()
+
     try {
       const sdk = getSDK()
       if (sdk.clipboard) {
-        sdk.clipboard
-          .getHistory()
-          .then((history) => {
-            setItems(history || [])
-            setLoading(false)
-          })
-          .catch((err) => {
-            console.warn('[ClipboardHistory] 获取剪贴板历史失败:', err)
-            setLoading(false)
-          })
-
         unsubscribe = sdk.clipboard.onChanged((updated) => {
           setItems(updated || [])
         })
-      } else {
-        setLoading(false)
       }
-    } catch {
-      setLoading(false)
+    } catch {}
+
+    const handleFocus = () => fetchLatest()
+    const handleVisibility = () => {
+      if (!document.hidden) fetchLatest()
     }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
       if (unsubscribe) unsubscribe()
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [])
 

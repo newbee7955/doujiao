@@ -31,7 +31,30 @@ export class ClipboardHistoryService extends EventEmitter {
     if (existsSync(this.storageFile)) {
       try {
         const raw = readFileSync(this.storageFile, 'utf-8')
-        this.items = JSON.parse(raw)
+        const parsed = JSON.parse(raw)
+        let rawList: any[] = []
+        if (Array.isArray(parsed)) {
+          rawList = parsed
+        } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).items)) {
+          rawList = (parsed as any).items
+        }
+
+        // 统一规范化清洗数据
+        this.items = rawList
+          .map((item: any) => {
+            const text = (item.text || item.content || '').toString()
+            return {
+              id: item.id || `clip_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              text: text,
+              type: 'text' as const,
+              timestamp: typeof item.timestamp === 'number' ? item.timestamp : Date.now(),
+              charCount: typeof item.charCount === 'number' ? item.charCount : text.length,
+              lineCount: typeof item.lineCount === 'number' ? item.lineCount : (text ? text.split(/\r?\n/).length : 1),
+              pinned: Boolean(item.pinned)
+            }
+          })
+          .filter((item) => item.text && item.text.trim())
+
         if (this.items.length > 0) {
           this.lastCopiedText = this.items[0].text
         }
@@ -39,6 +62,8 @@ export class ClipboardHistoryService extends EventEmitter {
         console.warn('[ClipboardService] 读取剪贴板历史文件失败，初始化为空:', err)
         this.items = []
       }
+    } else {
+      this.items = []
     }
   }
 

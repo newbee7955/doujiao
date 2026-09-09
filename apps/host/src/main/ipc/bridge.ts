@@ -10,6 +10,7 @@ import {
 import { ClipboardHistoryService } from '../services/clipboard-service'
 import { SambaService } from '../services/samba-service'
 import { LanTransferService } from '../services/lan-transfer-service'
+import { WorkspaceService } from '../services/workspace-service'
 import type { NetworkRequestOptions, DownloadTaskRequest } from '@doujiao/plugin-sdk'
 
 /**
@@ -217,7 +218,7 @@ export function registerPluginIpcBridge(): void {
 
   clipboardService.on('changed', (items) => {
     for (const [, instance] of (containerManager as any).views.entries()) {
-      if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
+      if (instance.view?.webContents && !instance.view.webContents.isDestroyed()) {
         instance.view.webContents.send('plugin:clipboard:changed', items)
       }
     }
@@ -455,6 +456,62 @@ export function registerPluginIpcBridge(): void {
         instance.view.webContents.send('plugin:lan:event', event)
       }
     }
+  })
+
+  // ==========================================
+  // 10. 本地工作目录与持久化文件管理 (独立外部存储，防卸载丢失)
+  // ==========================================
+  const workspaceService = WorkspaceService.getInstance()
+
+  const getVerifiedScope = (senderId: number, requestedScope?: string): string => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(senderId)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return requestedScope && requestedScope.trim() ? requestedScope.trim() : pluginId
+  }
+
+  ipcMain.handle('plugin:workspace:get-directory', async (event, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.getDirectory(effectiveScope)
+  })
+
+  ipcMain.handle('plugin:workspace:set-directory', async (event, directory: string, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.setDirectory(effectiveScope, directory)
+  })
+
+  ipcMain.handle('plugin:workspace:select-directory', async (event, defaultPath?: string) => {
+    getVerifiedScope(event.sender.id)
+    return workspaceService.selectDirectory(defaultPath)
+  })
+
+  ipcMain.handle('plugin:workspace:list-files', async (event, scope?: string, extensions?: string[]) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.listFiles(effectiveScope, extensions)
+  })
+
+  ipcMain.handle('plugin:workspace:read-file', async (event, relativePath: string, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.readFile(effectiveScope, relativePath)
+  })
+
+  ipcMain.handle('plugin:workspace:write-file', async (event, relativePath: string, content: string, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.writeFile(effectiveScope, relativePath, content)
+  })
+
+  ipcMain.handle('plugin:workspace:delete-file', async (event, relativePath: string, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.deleteFile(effectiveScope, relativePath)
+  })
+
+  ipcMain.handle('plugin:workspace:rename-file', async (event, oldName: string, newName: string, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.renameFile(effectiveScope, oldName, newName)
+  })
+
+  ipcMain.handle('plugin:workspace:open-directory', async (event, scope?: string) => {
+    const effectiveScope = getVerifiedScope(event.sender.id, scope)
+    return workspaceService.openDirectory(effectiveScope)
   })
 }
 

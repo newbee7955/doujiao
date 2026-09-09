@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react'
+import { getSDK } from '@doujiao/plugin-sdk'
 
 interface Note {
   id: string
@@ -7,21 +8,24 @@ interface Note {
   pinned: boolean
   updatedAt: number
   color?: string
+  fileName?: string
 }
 
 const DEFAULT_NOTES: Note[] = [
   {
-    id: 'note-welcome',
+    id: 'note-welcome.txt',
+    fileName: '随手记便签使用指南.txt',
     title: '随手记便签使用指南',
     content: `欢迎使用 豆角轻便记事本！🗒️
 
 这是一款随时随地记录灵感、临时备忘、代办事项与文本片段的随手记工具。
 
 💡 特性提示：
-1. 实时自动保存：键入即保存在本地，无需担心关闭后内容丢失。
-2. 置顶功能：点击右上角的图钉 📌 可以将高频使用的便签置顶在列表顶端。
-3. 搜索与导出：支持标题与正文关键词极速搜索，支持一键导出为 .txt 文件。
-4. 字号与字体切换：可以在顶部切换舒适的文字大小与行距。`,
+1. 外部安全工作目录：所有便签直接以 .txt 文件保存在系统用户「文档/Doujiao/Notes」目录下，应用卸载或删除也绝不会丢失！
+2. 实时自动存盘：键入即自动实时写入外部磁盘，可在顶部查看存盘状态。
+3. 自定义工作目录：支持随时更换存储路径，或一键打开所在本地文件夹。
+4. 置顶功能：点击右上角的图钉 📌 可以将高频使用的便签置顶在列表顶端。
+5. 搜索与导出：支持标题与正文关键词极速搜索，支持一键导出为 .txt 文件。`,
     pinned: true,
     updatedAt: Date.now(),
     color: 'amber'
@@ -37,15 +41,82 @@ export default function App(): JSX.Element {
     return DEFAULT_NOTES
   })
 
-  const [activeNoteId, setActiveNoteId] = useState<string>(() => notes[0]?.id || 'note-welcome')
+  const [activeNoteId, setActiveNoteId] = useState<string>(() => notes[0]?.id || 'note-welcome.txt')
   const [searchQuery, setSearchQuery] = useState('')
   const [fontSize, setFontSize] = useState<'sm' | 'base' | 'lg'>('base')
   const [fontFamily, setFontFamily] = useState<'sans' | 'mono'>('sans')
   const [toast, setToast] = useState<string | null>(null)
+  const [workspaceDir, setWorkspaceDir] = useState<string>('')
+  const [isDiskSaving, setIsDiskSaving] = useState(false)
 
   const activeNote = notes.find((n) => n.id === activeNoteId) || notes[0]
 
-  // 本地自动保存
+  const showToast = (msg: string) => {
+    setToast(msg)
+    setTimeout(() => setToast(null), 2500)
+  }
+
+  // 1. 初始化工作目录与磁盘 .txt 文件同步
+  const loadWorkspace = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        const dir = await sdk.workspace.getDirectory('notepad')
+        setWorkspaceDir(dir)
+        const files = await sdk.workspace.listFiles('notepad', ['.txt'])
+        if (files.length === 0) {
+          // 首次启动，若本地缓存有旧笔记或默认笔记，自动平滑迁移写入磁盘
+          const initialNotes = notes.length > 0 ? notes : DEFAULT_NOTES
+          for (const n of initialNotes) {
+            const fName = `${(n.title || '便签').replace(/[\\/:*?"<>|]/g, '_')}.txt`
+            await sdk.workspace.writeFile(fName, n.content, 'notepad')
+          }
+          const refreshed = await sdk.workspace.listFiles('notepad', ['.txt'])
+          const loaded: Note[] = []
+          for (const f of refreshed) {
+            const content = await sdk.workspace.readFile(f.relativePath, 'notepad')
+            loaded.push({
+              id: f.relativePath,
+              fileName: f.relativePath,
+              title: f.name.replace(/\.txt$/i, ''),
+              content,
+              pinned: f.name.includes('指南') || f.name.includes('置顶'),
+              updatedAt: f.updatedAt
+            })
+          }
+          if (loaded.length > 0) {
+            setNotes(loaded)
+            setActiveNoteId(loaded[0].id)
+          }
+        } else {
+          const loaded: Note[] = []
+          for (const f of files) {
+            const content = await sdk.workspace.readFile(f.relativePath, 'notepad')
+            loaded.push({
+              id: f.relativePath,
+              fileName: f.relativePath,
+              title: f.name.replace(/\.txt$/i, ''),
+              content,
+              pinned: f.name.includes('指南') || f.name.includes('置顶'),
+              updatedAt: f.updatedAt
+            })
+          }
+          if (loaded.length > 0) {
+            setNotes(loaded)
+            setActiveNoteId(loaded[0].id)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Notepad] 读取工作目录失败，使用本地缓存模式:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadWorkspace()
+  }, [])
+
+  // 2. 本地自动保存备份
   useEffect(() => {
     try {
       localStorage.setItem('doujiao_notepad_notes', JSON.stringify(notes))
@@ -54,9 +125,54 @@ export default function App(): JSX.Element {
     }
   }, [notes])
 
-  const showToast = (msg: string) => {
-    setToast(msg)
-    setTimeout(() => setToast(null), 2500)
+  // 3. 自动防抖写入外部磁盘物理 .txt 文件
+  useEffect(() => {
+    if (!activeNote) return
+    const timer = setTimeout(async () => {
+      try {
+        const sdk = getSDK()
+        if (sdk?.workspace) {
+          const targetName = activeNote.fileName || `${(activeNote.title || '便签').replace(/[\\/:*?"<>|]/g, '_')}.txt`
+          setIsDiskSaving(true)
+          await sdk.workspace.writeFile(targetName, activeNote.content, 'notepad')
+          setIsDiskSaving(false)
+        }
+      } catch {
+        setIsDiskSaving(false)
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [activeNote?.content])
+
+  // 更换工作目录
+  const handleSelectWorkspaceDir = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        const res = await sdk.workspace.selectDirectory(workspaceDir)
+        if (!res.canceled && res.directoryPath) {
+          await sdk.workspace.setDirectory(res.directoryPath, 'notepad')
+          setWorkspaceDir(res.directoryPath)
+          showToast('工作目录已切换')
+          await loadWorkspace()
+        }
+      }
+    } catch (err) {
+      console.error('切换工作目录失败:', err)
+      showToast('切换工作目录失败')
+    }
+  }
+
+  // 打开工作目录
+  const handleOpenWorkspaceDir = async () => {
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        await sdk.workspace.openDirectory('notepad')
+      }
+    } catch (err) {
+      console.error('打开目录失败:', err)
+    }
   }
 
   // 过滤笔记
@@ -74,33 +190,78 @@ export default function App(): JSX.Element {
   }, [notes, searchQuery])
 
   // 新建笔记
-  const handleNewNote = () => {
+  const handleNewNote = async () => {
+    let baseName = '新便签'
+    let title = baseName
+    let counter = 1
+    while (notes.some((n) => n.title === title)) {
+      title = `${baseName}_${counter++}`
+    }
+    const fileName = `${title}.txt`
+    const defaultContent = ''
+
+    try {
+      const sdk = getSDK()
+      if (sdk?.workspace) {
+        await sdk.workspace.writeFile(fileName, defaultContent, 'notepad')
+      }
+    } catch {}
+
     const newNote: Note = {
-      id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      title: '新便签',
-      content: '',
+      id: fileName,
+      fileName,
+      title,
+      content: defaultContent,
       pinned: false,
       updatedAt: Date.now()
     }
     setNotes((prev) => [newNote, ...prev])
     setActiveNoteId(newNote.id)
-    showToast('已新建空白便签')
+    showToast(`已在工作目录新建: ${fileName}`)
   }
 
   // 更新内容
-  const updateNote = (field: 'title' | 'content', val: string) => {
-    setNotes((prev) =>
-      prev.map((n) => {
-        if (n.id === activeNote.id) {
-          return {
-            ...n,
-            [field]: val,
-            updatedAt: Date.now()
+  const updateNote = async (field: 'title' | 'content', val: string) => {
+    if (field === 'title') {
+      const safeTitle = val.trim() || '新便签'
+      const newFileName = `${safeTitle.replace(/[\\/:*?"<>|]/g, '_')}.txt`
+      const oldFileName = activeNote.fileName
+
+      if (oldFileName && oldFileName !== newFileName) {
+        try {
+          const sdk = getSDK()
+          if (sdk?.workspace) {
+            await sdk.workspace.renameFile(oldFileName, newFileName, 'notepad')
           }
+        } catch (err) {
+          console.warn('重命名文件失败:', err)
         }
-        return n
-      })
-    )
+      }
+
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === activeNote.id
+            ? { ...n, title: val, fileName: newFileName, id: newFileName, updatedAt: Date.now() }
+            : n
+        )
+      )
+      if (activeNoteId === activeNote.id) {
+        setActiveNoteId(newFileName)
+      }
+    } else {
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.id === activeNote.id) {
+            return {
+              ...n,
+              [field]: val,
+              updatedAt: Date.now()
+            }
+          }
+          return n
+        })
+      )
+    }
   }
 
   // 切换置顶
@@ -113,18 +274,29 @@ export default function App(): JSX.Element {
   }
 
   // 删除便签
-  const handleDelete = (id: string, e?: React.MouseEvent) => {
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
     if (notes.length <= 1) {
       showToast('请至少保留一个便签')
       return
+    }
+    const noteToDelete = notes.find((n) => n.id === id)
+    if (noteToDelete?.fileName) {
+      try {
+        const sdk = getSDK()
+        if (sdk?.workspace) {
+          await sdk.workspace.deleteFile(noteToDelete.fileName, 'notepad')
+        }
+      } catch (err) {
+        console.warn('删除物理文件失败:', err)
+      }
     }
     const remaining = notes.filter((n) => n.id !== id)
     setNotes(remaining)
     if (activeNoteId === id) {
       setActiveNoteId(remaining[0].id)
     }
-    showToast('便签已删除')
+    showToast('便签已从工作目录删除')
   }
 
   // 复制内容
@@ -193,6 +365,40 @@ export default function App(): JSX.Element {
             <span>+</span>
             <span>新建</span>
           </button>
+        </div>
+
+        {/* 工作目录卡片 (独立外部存储，卸载不丢失) */}
+        <div className="p-2.5 bg-slate-900/40 border-b border-slate-800/60">
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <span className="font-medium text-slate-300 flex items-center gap-1">
+              <span>📁</span>
+              <span>工作目录</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">卸载不丢失</span>
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleOpenWorkspaceDir}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 text-[10px] transition-colors"
+                title="在 Windows 资源管理器中打开当前工作文件夹"
+              >
+                📂 打开
+              </button>
+              <button
+                onClick={handleSelectWorkspaceDir}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] transition-colors"
+                title="更换工作存储文件夹"
+              >
+                🔄 切换
+              </button>
+            </div>
+          </div>
+          <div
+            className="text-[10px] font-mono text-slate-400 truncate bg-slate-950/80 px-2 py-1 rounded border border-slate-800/60 cursor-pointer hover:border-slate-700 hover:text-slate-300 transition-colors"
+            onClick={handleOpenWorkspaceDir}
+            title={workspaceDir || '默认安全目录：系统用户「文档/Doujiao/Notes」'}
+          >
+            {workspaceDir ? workspaceDir : '系统用户「文档/Doujiao/Notes」'}
+          </div>
         </div>
 
         {/* 搜索框 */}
@@ -279,13 +485,26 @@ export default function App(): JSX.Element {
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-900">
         {/* 顶部控制栏 */}
         <div className="h-14 px-5 bg-slate-950/80 border-b border-slate-800/80 flex items-center justify-between shrink-0 gap-3">
-          <input
-            type="text"
-            value={activeNote.title}
-            onChange={(e) => updateNote('title', e.target.value)}
-            className="bg-transparent text-base font-semibold text-white border-b border-transparent hover:border-slate-700 focus:border-amber-500 focus:outline-none px-1.5 py-0.5 max-w-md truncate"
-            placeholder="输入便签标题..."
-          />
+          <div className="flex items-center gap-2 flex-1 max-w-md">
+            <input
+              type="text"
+              value={activeNote.title}
+              onChange={(e) => updateNote('title', e.target.value)}
+              className="bg-transparent text-base font-semibold text-white border-b border-transparent hover:border-slate-700 focus:border-amber-500 focus:outline-none px-1.5 py-0.5 w-full truncate"
+              placeholder="输入便签标题..."
+            />
+            {isDiskSaving ? (
+              <span className="text-[10px] text-amber-400 flex items-center gap-1 font-mono shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                写入中...
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-500 flex items-center gap-1 font-mono shrink-0" title="已自动实时存入外部磁盘 .txt 文件">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                已存盘
+              </span>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             {/* 字号切换 */}

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 26,
-  "updatedAt": "2026-09-09T15:24:57.916Z",
+  "registryVersion": 30,
+  "updatedAt": "2026-09-09T16:18:18.918Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -160,9 +160,34 @@
       "id": "markdown-editor",
       "publisher": "doujiao-official",
       "name": "Markdown 编辑器",
-      "description": "支持双栏实时高亮预览、快捷语法工具栏、多文档本地管理及 Markdown 文件导入导出的沉浸式写作工具",
+      "description": "支持双栏实时高亮预览、快捷语法工具栏、外部安全工作目录持久化存储（应用卸载不丢失）及 Markdown 导入导出",
       "icon": "📝",
       "releases": [
+        {
+          "version": "1.1.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T16:18:18.889Z",
+          "changelog": "官方发布版本 v1.1.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "workspace"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/markdown-editor-v1.1.0.zip",
+              "size": 58812,
+              "sha256": "930445e747bc243e6fcb0524e8655c16573c855f431993dc348080522a6026b7",
+              "signature": "NdyqBfUty17GVAvcnisXmXhRlxNG/xQzV703lUkCHj2OyTtKHCGMJLQ/hVIb2+DhVZ+g83LU8lbuuWglInUJBw=="
+            }
+          ]
+        },
         {
           "version": "1.0.0",
           "channel": "stable",
@@ -190,9 +215,34 @@
       "id": "notepad",
       "publisher": "doujiao-official",
       "name": "轻便记事本",
-      "description": "零负担极速纯文本随手记，支持多便签卡片、置顶备忘、字数统计与自动持久化",
+      "description": "零负担极速纯文本随手记，支持外部安全工作目录持久化存储（应用卸载不丢失）、多便签卡片、置顶备忘与字数统计",
       "icon": "🗒️",
       "releases": [
+        {
+          "version": "1.1.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T16:18:18.903Z",
+          "changelog": "官方发布版本 v1.1.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "workspace"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/notepad-v1.1.0.zip",
+              "size": 56116,
+              "sha256": "31b7c40ede8333b062f8a883cc6b9f3e4db4f66d30d3f1e37182125d1867e557",
+              "signature": "Tf0RTmu3VOGn5azUjThcgXE1pT2DIxRB866yOYyZu0s1ezsRISM2KlCNpbSg+9IFObPhCxsJuea3rn86Zf8gAw=="
+            }
+          ]
+        },
         {
           "version": "1.0.0",
           "channel": "stable",
@@ -223,6 +273,31 @@
       "description": "系统剪贴板实时监听、历史记录持久化、一键回写复制、常用文本置顶与快捷检索",
       "icon": "📋",
       "releases": [
+        {
+          "version": "1.0.1",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T16:18:18.834Z",
+          "changelog": "官方发布版本 v1.0.1",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "clipboard.history"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/clipboard-history-v1.0.1.zip",
+              "size": 54173,
+              "sha256": "51c96a4135ae9143dff718a2524864dba20f0669c535ff925688abed1948ddd6",
+              "signature": "phqYjZ4dpazQBEaKjLX3KzJMlDOVdXYcvgJGRLyRLKkqnp3S09iN82LPZWGXVAANDQfXlu9eI/JmWlwsmBPUBQ=="
+            }
+          ]
+        },
         {
           "version": "1.0.0",
           "channel": "stable",
@@ -328,9 +403,34 @@
       "id": "lan-transfer",
       "publisher": "doujiao-official",
       "name": "局域网快传",
-      "description": "局域网跨设备文件传输助手：电脑与手机双向互传、手机扫码免装 App 秒连、大文件流式秒传、局域网文本与剪贴板极速同步",
+      "description": "局域网跨设备文件传输助手：支持文件快速拖拽投放、电脑与手机双向互传、手机扫码秒连免装 App、局域网文本即时互传",
       "icon": "⚡",
       "releases": [
+        {
+          "version": "1.0.1",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T16:18:18.918Z",
+          "changelog": "官方发布版本 v1.0.1",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "lan.transfer"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/lan-transfer-v1.0.1.zip",
+              "size": 58570,
+              "sha256": "b9e59387166f7c75f02eadb70e85888b1885f40436a968bfdcabe8006c20b424",
+              "signature": "GICe/tQMUzCzftoTU5noyd0NURpzq+roo22iJkYjxY6rAYKspdCKfZVLvFVNi3SCgDF1uHqtk2TCs8FrR2cZAw=="
+            }
+          ]
+        },
         {
           "version": "1.0.0",
           "channel": "stable",
