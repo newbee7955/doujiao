@@ -79,7 +79,7 @@ export class ProxyManager {
   public async init(): Promise<void> {
     await this.applyProxy()
     const effective = await this.resolveProxy('https://github.com')
-    console.log(`[ProxyManager] 代理初始化完毕 (模式: ${this.config.mode}, GitHub 有效代理: ${effective})`)
+    console.log(`[ProxyManager] Initialized (mode: ${this.config.mode}, effective for GitHub: ${effective})`)
   }
 
   /**
@@ -92,7 +92,7 @@ export class ProxyManager {
         await session.defaultSession.setProxy({
           mode: 'direct'
         })
-        console.log('[ProxyManager] 已切换至「关闭代理 / 直连模式」')
+        console.log('[ProxyManager] Switched to direct mode (proxy disabled)')
       } else if (this.config.mode === 'custom' && this.config.customProxyUrl) {
         // 自定义代理服务器
         await session.defaultSession.setProxy({
@@ -100,16 +100,16 @@ export class ProxyManager {
           proxyRules: this.config.customProxyUrl.trim(),
           proxyBypassRules: this.config.bypassRules || '<local>;localhost;127.0.0.1'
         })
-        console.log(`[ProxyManager] 已切换至「自定义代理」: ${this.config.customProxyUrl}`)
+        console.log(`[ProxyManager] Switched to custom proxy: ${this.config.customProxyUrl}`)
       } else {
         // 默认：跟随系统代理 (system)
         await session.defaultSession.setProxy({
           mode: 'system'
         })
-        console.log('[ProxyManager] 已切换至「跟随系统代理模式」')
+        console.log('[ProxyManager] Switched to system proxy mode')
       }
     } catch (err) {
-      console.error('[ProxyManager] 应用代理配置失败:', err)
+      console.error('[ProxyManager] Failed to apply proxy config:', err)
     }
   }
 

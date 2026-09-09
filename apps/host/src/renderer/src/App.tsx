@@ -102,10 +102,43 @@ export default function App(): JSX.Element {
     if (window.hostAPI?.fetchMarketPlugins) {
       setLoadingMarket(true)
       try {
-        const market = await window.hostAPI.fetchMarketPlugins(force)
-        setMarketPlugins(market || [])
+        const res = await window.hostAPI.fetchMarketPlugins(force)
+        let list: MarketPlugin[] = []
+        let fromRemote = false
+        let version = 0
+        let errorMsg = ''
+
+        if (Array.isArray(res)) {
+          list = res
+        } else if (res && Array.isArray(res.plugins)) {
+          list = res.plugins
+          fromRemote = res.fromRemote
+          version = res.registryVersion
+          errorMsg = res.error
+        }
+
+        setMarketPlugins(list)
+
+        if (force) {
+          if (fromRemote) {
+            setInstallMsg({
+              text: `✓ 已成功直连 GitHub 同步最新插件市场清单 (版本: v${version})！`,
+              type: 'success'
+            })
+          } else {
+            setInstallMsg({
+              text: `⚠️ GitHub 连接较慢 (${errorMsg || '网络超时'})，已载入本地最新索引缓存。您可前往「系统设置」切换或测试代理。`,
+              type: 'error'
+            })
+          }
+          setTimeout(() => setInstallMsg(null), 4000)
+        }
       } catch (err: any) {
         console.error('拉取市场清单失败:', err)
+        if (force) {
+          setInstallMsg({ text: `刷新异常: ${err?.message}`, type: 'error' })
+          setTimeout(() => setInstallMsg(null), 4000)
+        }
       } finally {
         setLoadingMarket(false)
       }

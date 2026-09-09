@@ -58,10 +58,7 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
   // 6. 插件市场：拉取远端市场聚合清单 (支持强制刷新)
   ipcMain.handle('host:registry:fetch', async (_, forceRefresh?: boolean) => {
     const { RegistryClient } = await import('../plugins/registry-client')
-    if (forceRefresh) {
-      await RegistryClient.getInstance().fetchRegistry(true)
-    }
-    return await RegistryClient.getInstance().getMarketPlugins()
+    return await RegistryClient.getInstance().getMarketPlugins(forceRefresh)
   })
 
   // 7. 插件市场：一键下载、双重验签 (SHA-256 + Ed25519) 并事务安装

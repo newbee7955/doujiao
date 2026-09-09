@@ -57,13 +57,24 @@ export interface MarketPluginView {
   isDev?: boolean
 }
 
-const GITHUB_OFFICIAL_REGISTRY_URL =
-  'https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json'
+export interface MarketFetchResult {
+  plugins: MarketPluginView[]
+  fromRemote: boolean
+  registryVersion: number
+  error?: string
+}
+
+const GITHUB_OFFICIAL_REGISTRY_URLS = [
+  'https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json',
+  'https://github.com/newbee7955/doujiao/raw/main/registry/plugins-registry.json'
+]
 
 export class RegistryClient {
   private static instance: RegistryClient
   private cachedRegistry: RegistryData | null = null
   private lastFetchTime = 0
+  private lastSyncFromRemote = false
+  private lastSyncError: string | null = null
   private cacheDir: string
 
   private constructor() {
@@ -106,7 +117,7 @@ export class RegistryClient {
   }
 
   /**
-   * 获取中心市场数据（优先本地极速就绪，支持 CDN 镜像加速同步）
+   * 获取中心市场数据（直连 GitHub 官方源，15s 超时与容错）
    */
   public async fetchRegistry(forceRefresh = false): Promise<RegistryData> {
     const now = Date.now()
@@ -114,38 +125,48 @@ export class RegistryClient {
       return this.cachedRegistry
     }
 
-    // 1. 本地极速兜底/开发优先 (0ms 延迟)
+    // 1. 本地极速兜底 (非强制刷新且无缓存时优先使用)
     const localData = this.loadLocalRegistry()
-    if (localData && !forceRefresh) {
+    if (localData && !forceRefresh && !this.cachedRegistry) {
       this.cachedRegistry = localData
       this.lastFetchTime = now
+      this.lastSyncFromRemote = false
       return localData
     }
 
-    // 2. 直连 GitHub 官方仓库拉取最新插件市场索引（遵循系统代理或用户设定的代理）
-    try {
-      console.log(`[RegistryClient] 直连 GitHub 官方源拉取市场索引: ${GITHUB_OFFICIAL_REGISTRY_URL}`)
-      const resp = await net.fetch(GITHUB_OFFICIAL_REGISTRY_URL, {
-        headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
-        signal: AbortSignal.timeout(10000)
-      })
-      if (resp.ok) {
-        const data = (await resp.json()) as RegistryData
-        if (data && Array.isArray(data.plugins)) {
-          this.cachedRegistry = data
-          this.lastFetchTime = now
-          console.log(`[RegistryClient] ✓ 成功直连 GitHub 同步最新插件索引 (版本: ${data.registryVersion})`)
-          return data
+    this.lastSyncFromRemote = false
+    this.lastSyncError = null
+
+    // 2. 直连 GitHub 官方源拉取最新插件市场索引 (15s 超时)
+    for (const registryUrl of GITHUB_OFFICIAL_REGISTRY_URLS) {
+      try {
+        console.log(`[RegistryClient] [GitHub] Fetching official registry: ${registryUrl}`)
+        const resp = await net.fetch(registryUrl, {
+          headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
+          signal: AbortSignal.timeout(15000)
+        })
+        if (resp.ok) {
+          const data = (await resp.json()) as RegistryData
+          if (data && Array.isArray(data.plugins)) {
+            this.cachedRegistry = data
+            this.lastFetchTime = now
+            this.lastSyncFromRemote = true
+            console.log(`[RegistryClient] [GitHub] Successfully synced registry (version: ${data.registryVersion})`)
+            return data
+          }
+        } else {
+          this.lastSyncError = `HTTP ${resp.status}`
+          console.warn(`[RegistryClient] [GitHub] Response status: HTTP ${resp.status}`)
         }
-      } else {
-        console.warn(`[RegistryClient] GitHub 响应状态非 200: HTTP ${resp.status}`)
+      } catch (err: any) {
+        this.lastSyncError = err?.message || 'Connection timeout'
+        console.warn(`[RegistryClient] [GitHub] Fetch attempt failed (${this.lastSyncError})`)
       }
-    } catch (err: any) {
-      console.warn(`[RegistryClient] 直连 GitHub 获取索引异常 (${err?.message})，将回退使用本地缓存`)
     }
 
-    // 3. 远端网络不可用时，使用本地已知最新清单
+    // 3. 远端暂时超时或网络不可用时，平滑回退使用本地最新缓存清单
     if (localData) {
+      console.log('[RegistryClient] Using local registry fallback')
       this.cachedRegistry = localData
       this.lastFetchTime = now
       return localData
@@ -157,8 +178,8 @@ export class RegistryClient {
   /**
    * 获取面向渲染层的市场插件聚合视图（整合本地安装状态与更新提示）
    */
-  public async getMarketPlugins(): Promise<MarketPluginView[]> {
-    const registry = await this.fetchRegistry()
+  public async getMarketPlugins(forceRefresh = false): Promise<MarketFetchResult> {
+    const registry = await this.fetchRegistry(forceRefresh)
     const pluginManager = PluginManager.getInstance()
     const installed = pluginManager.listAllPlugins()
     const hostVersion = app.getVersion() || '0.2.0'
@@ -199,7 +220,12 @@ export class RegistryClient {
       })
     }
 
-    return views
+    return {
+      plugins: views,
+      fromRemote: this.lastSyncFromRemote,
+      registryVersion: registry.registryVersion || 0,
+      error: this.lastSyncError || undefined
+    }
   }
 
   /**
