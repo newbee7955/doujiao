@@ -57,8 +57,11 @@ export interface MarketPluginView {
   isDev?: boolean
 }
 
-const DEFAULT_REGISTRY_URL =
+const REMOTE_REGISTRY_MIRRORS = [
+  'https://raw.gitmirror.com/newbee7955/doujiao/main/registry/plugins-registry.json',
+  'https://ghproxy.net/https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json',
   'https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json'
+]
 
 export class RegistryClient {
   private static instance: RegistryClient
@@ -81,36 +84,14 @@ export class RegistryClient {
   }
 
   /**
-   * 获取中心市场数据（优先远端 GitHub Raw，自动带本地 fallback）
+   * 本地索引候选探测（0ms 极速加载）
    */
-  public async fetchRegistry(forceRefresh = false): Promise<RegistryData> {
-    const now = Date.now()
-    if (!forceRefresh && this.cachedRegistry && now - this.lastFetchTime < 60000) {
-      return this.cachedRegistry
-    }
-
-    // 1. 尝试从网络拉取
-    try {
-      const resp = await net.fetch(DEFAULT_REGISTRY_URL, {
-        headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
-        signal: AbortSignal.timeout(5000)
-      })
-      if (resp.ok) {
-        const data = (await resp.json()) as RegistryData
-        this.cachedRegistry = data
-        this.lastFetchTime = now
-        console.log('[RegistryClient] 成功从远端中心市场同步插件清单')
-        return data
-      }
-    } catch (err) {
-      console.warn('[RegistryClient] 远端 Registry 拉取失败，尝试读取本地索引 fallback:', err)
-    }
-
-    // 2. 本地 fallback: registry/plugins-registry.json
+  private loadLocalRegistry(): RegistryData | null {
     const candidates = [
+      resolve(process.cwd(), 'registry/plugins-registry.json'),
       resolve(app.getAppPath(), '../../registry/plugins-registry.json'),
       resolve(app.getAppPath(), '../registry/plugins-registry.json'),
-      resolve(process.cwd(), 'registry/plugins-registry.json')
+      resolve(app.getAppPath(), 'registry/plugins-registry.json')
     ]
 
     for (const file of candidates) {
@@ -118,11 +99,58 @@ export class RegistryClient {
         try {
           const raw = readFileSync(file, 'utf-8')
           const data = JSON.parse(raw) as RegistryData
-          this.cachedRegistry = data
-          this.lastFetchTime = now
-          return data
-        } catch (e) {}
+          if (data && data.plugins) {
+            return data
+          }
+        } catch {}
       }
+    }
+    return null
+  }
+
+  /**
+   * 获取中心市场数据（优先本地极速就绪，支持 CDN 镜像加速同步）
+   */
+  public async fetchRegistry(forceRefresh = false): Promise<RegistryData> {
+    const now = Date.now()
+    if (!forceRefresh && this.cachedRegistry && now - this.lastFetchTime < 60000) {
+      return this.cachedRegistry
+    }
+
+    // 1. 本地极速兜底/开发优先 (0ms 延迟)
+    const localData = this.loadLocalRegistry()
+    if (localData && !forceRefresh) {
+      this.cachedRegistry = localData
+      this.lastFetchTime = now
+      return localData
+    }
+
+    // 2. 尝试从多镜像 CDN 同步最新远端索引 (每个镜像 2.5s 超时)
+    for (const mirrorUrl of REMOTE_REGISTRY_MIRRORS) {
+      try {
+        const resp = await net.fetch(mirrorUrl, {
+          headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
+          signal: AbortSignal.timeout(2500)
+        })
+        if (resp.ok) {
+          const data = (await resp.json()) as RegistryData
+          if (data && Array.isArray(data.plugins)) {
+            this.cachedRegistry = data
+            this.lastFetchTime = now
+            console.log(`[RegistryClient] Synced registry successfully from mirror: ${mirrorUrl}`)
+            return data
+          }
+        }
+      } catch {
+        // 继续尝试下一个镜像
+      }
+    }
+
+    // 3. 远端均不可用时，使用本地已知最新清单
+    if (localData) {
+      this.cachedRegistry = localData
+      this.lastFetchTime = now
+      return localData
     }
 
     return this.cachedRegistry || { schemaVersion: 2, registryVersion: 0, updatedAt: '', plugins: [] }
@@ -208,8 +236,10 @@ export class RegistryClient {
     // 1. 如果本地开发已有生成好的 release 包，优先使用本地包提速；否则通过网络下载
     let downloaded = false
     const localReleaseCandidates = [
+      resolve(process.cwd(), 'registry/releases', zipFileName),
       resolve(app.getAppPath(), '../../registry/releases', zipFileName),
-      resolve(process.cwd(), 'registry/releases', zipFileName)
+      resolve(app.getAppPath(), '../registry/releases', zipFileName),
+      resolve(app.getAppPath(), 'registry/releases', zipFileName)
     ]
     for (const localZip of localReleaseCandidates) {
       if (existsSync(localZip)) {
@@ -217,15 +247,26 @@ export class RegistryClient {
         const fs = await import('fs')
         fs.writeFileSync(targetZipPath, buf)
         downloaded = true
-        console.log(`[RegistryClient] 检测到本地发布存档，已复用: ${localZip}`)
+        console.log(`[RegistryClient] Using local release archive: ${localZip}`)
         break
       }
     }
 
     if (!downloaded) {
-      const resp = await net.fetch(artifact.url)
-      if (!resp.ok) {
-        throw new Error(`下载插件包失败: HTTP ${resp.status} ${resp.statusText}`)
+      const downloadUrls = [
+        artifact.url,
+        `https://ghproxy.net/${artifact.url}`
+      ]
+      let resp: any = null
+      for (const dUrl of downloadUrls) {
+        try {
+          resp = await net.fetch(dUrl, { signal: AbortSignal.timeout(15000) })
+          if (resp && resp.ok) break
+        } catch {}
+      }
+
+      if (!resp || !resp.ok) {
+        throw new Error(`下载插件包失败: HTTP ${resp?.status || '连接超时'}`)
       }
 
       const fileStream = createWriteStream(targetZipPath)
