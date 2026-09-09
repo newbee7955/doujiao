@@ -1,0 +1,17 @@
+{
+  "$schema": "https://doujiao.app/schemas/plugin-manifest.v2.json",
+  "id": "notepad",
+  "publisher": "doujiao-official",
+  "name": "轻便记事本",
+  "version": "1.0.0",
+  "description": "零负担极速纯文本随手记，支持多便签卡片、置顶备忘、字数统计与自动持久化",
+  "icon": "🗒️",
+  "engines": {
+    "doujiao": ">=0.2.0 <0.3.0",
+    "pluginApi": "^1.0.0"
+  },
+  "entrypoints": {
+    "ui": "dist/index.html"
+  },
+  "permissions": []
+}

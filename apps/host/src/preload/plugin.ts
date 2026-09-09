@@ -71,6 +71,27 @@ const sdk: DoujiaoSDK = {
     }
   },
 
+  clipboard: {
+    getHistory: () => ipcRenderer.invoke('plugin:clipboard:get-history'),
+    writeText: (text: string) => ipcRenderer.invoke('plugin:clipboard:write-text', text),
+    deleteItem: (id: string) => ipcRenderer.invoke('plugin:clipboard:delete', id),
+    clearHistory: () => ipcRenderer.invoke('plugin:clipboard:clear'),
+    togglePin: (id: string) => ipcRenderer.invoke('plugin:clipboard:toggle-pin', id),
+    onChanged: (callback: (items: any[]) => void) => {
+      const handler = (_: any, items: any[]) => {
+        try {
+          callback(items)
+        } catch (err) {
+          console.error('[DoujiaoSDK] 剪贴板监听回调异常:', err)
+        }
+      }
+      ipcRenderer.on('plugin:clipboard:changed', handler)
+      return () => {
+        ipcRenderer.removeListener('plugin:clipboard:changed', handler)
+      }
+    }
+  },
+
   ui: {
     notify: (options) => {
       console.log(`[PluginToast] [${options.type || 'info'}] ${options.message}`)

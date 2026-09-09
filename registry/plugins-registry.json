@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 7,
-  "updatedAt": "2026-09-09T10:11:13.990Z",
+  "registryVersion": 15,
+  "updatedAt": "2026-09-09T11:02:51.142Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -151,6 +151,137 @@
               "size": 55634,
               "sha256": "9daefb495f2646357526dc714318ec7e5d3a8f53d4ccb93588809a3f98a9386c",
               "signature": "b7acTXQIqKC/kkOl6stYf+w4XvTV0JX6nnJPuvXkFBxtGtKvn5XcHrqZeu84BgnXYwQM4UeortkXp0pmUHi3DQ=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "markdown-editor",
+      "publisher": "doujiao-official",
+      "name": "Markdown 编辑器",
+      "description": "支持双栏实时高亮预览、快捷语法工具栏、多文档本地管理及 Markdown 文件导入导出的沉浸式写作工具",
+      "icon": "📝",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T11:02:50.626Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/markdown-editor-v1.0.0/markdown-editor-v1.0.0.zip",
+              "size": 57264,
+              "sha256": "5b013ed7ae75e2da827ec982f3598f42f1feb5f318b9de61b2cbdee56fef08f1",
+              "signature": "MXStyRFzdi0nNt+Nk2EHJKxOuOCcFvufzEOH+QKA7U6P4VZIO5tLJzzFdK6/3V9VL0yYsBIq10oQjZXzliPDAA=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "notepad",
+      "publisher": "doujiao-official",
+      "name": "轻便记事本",
+      "description": "零负担极速纯文本随手记，支持多便签卡片、置顶备忘、字数统计与自动持久化",
+      "icon": "🗒️",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T11:02:50.815Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/notepad-v1.0.0/notepad-v1.0.0.zip",
+              "size": 54414,
+              "sha256": "f2532e8e671945b8ee67eead48b58fb47a17a38afa158019461bbb9a50be51c9",
+              "signature": "a6WxI6WSURkNCkTVmxpIOllKtpVLHdikNUWk88vnDoBoB1MwRGN7SwqYBqW18lsHn/CQi6L4J66Mfo+u5GOmCQ=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "clipboard-history",
+      "publisher": "doujiao-official",
+      "name": "剪贴板历史记录",
+      "description": "系统剪贴板实时监听、历史记录持久化、一键回写复制、常用文本置顶与快捷检索",
+      "icon": "📋",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T11:02:50.979Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "clipboard.history"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/clipboard-history-v1.0.0/clipboard-history-v1.0.0.zip",
+              "size": 54084,
+              "sha256": "e1fc3209dc89e54c00765b39758b1689d88256cbb3aa6d5f490fedb4aadc9565",
+              "signature": "/W7C7p+7lcXYQtlqB9d/QBFJ0Bdvk095+63xbkZNS02W7q4QMxQjNK0wnplOjLucxd0HeSWeVhzYzmxKruX6Dw=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "browser",
+      "publisher": "doujiao-official",
+      "name": "内置隔离浏览器",
+      "description": "基于独立会话沙箱的多标签极速浏览器，支持智能搜索寻址、书签收藏、导航控制及存储隔离",
+      "icon": "🌐",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T11:02:51.142Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "network.request",
+              "hosts": [
+                "*"
+              ]
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/browser-v1.0.0/browser-v1.0.0.zip",
+              "size": 54522,
+              "sha256": "f288e167b35d5294aea99c326e99aa6b2c7fbaac6f8ff5e24bb0b3433e80a73e",
+              "signature": "CtjhU0bC4JnxtXu/R04hQxAUH6pawGssYYkN3z76l1iUCj3NVdffpzbelmYFjmifdX+toI+f3ooZtD4rOsbHBw=="
             }
           ]
         }

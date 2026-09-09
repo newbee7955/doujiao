@@ -7,6 +7,7 @@ import {
   getDouyinLoginStatus,
   openDouyinLoginWindow
 } from '../auth/douyin-auth'
+import { ClipboardHistoryService } from '../services/clipboard-service'
 import type { NetworkRequestOptions, DownloadTaskRequest } from '@doujiao/plugin-sdk'
 
 /**
@@ -178,5 +179,46 @@ export function registerPluginIpcBridge(): void {
       }
     }
   }
+
+  // 8. 剪贴板历史服务受控 IPC
+  const clipboardService = ClipboardHistoryService.getInstance()
+
+  ipcMain.handle('plugin:clipboard:get-history', async (event) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return clipboardService.getHistory()
+  })
+
+  ipcMain.handle('plugin:clipboard:write-text', async (event, text: string) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return clipboardService.writeText(text)
+  })
+
+  ipcMain.handle('plugin:clipboard:delete', async (event, id: string) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return clipboardService.deleteItem(id)
+  })
+
+  ipcMain.handle('plugin:clipboard:clear', async (event) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return clipboardService.clearHistory()
+  })
+
+  ipcMain.handle('plugin:clipboard:toggle-pin', async (event, id: string) => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(event.sender.id)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    return clipboardService.togglePin(id)
+  })
+
+  clipboardService.on('changed', (items) => {
+    for (const [, instance] of (containerManager as any).views.entries()) {
+      if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
+        instance.view.webContents.send('plugin:clipboard:changed', items)
+      }
+    }
+  })
 }
 

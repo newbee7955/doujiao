@@ -159,12 +159,22 @@ export class PluginViewContainerManager {
         preload: pluginPreloadPath,
         webSecurity: true,
         allowRunningInsecureContent: false,
-        spellcheck: false
+        spellcheck: false,
+        webviewTag: true
       }
     })
 
     // 挂载安全边界防护
     setupSecurityGuards(view.webContents, true)
+
+    // 对内置 webview 挂载安全限制
+    view.webContents.on('will-attach-webview', (_, webPreferences) => {
+      delete (webPreferences as any).preload
+      webPreferences.nodeIntegration = false
+      webPreferences.contextIsolation = true
+      webPreferences.sandbox = true
+      webPreferences.allowRunningInsecureContent = false
+    })
 
     // 加载自定义安全协议页面
     const pluginUrl = `doujiao-plugin://${pluginId}/index.html`

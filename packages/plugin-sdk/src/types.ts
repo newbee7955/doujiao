@@ -8,6 +8,7 @@ export type CapabilityType =
   | 'browser.login'
   | 'browser.extract'
   | 'media.merge'
+  | 'clipboard.history'
   | 'ui.dialog';
 
 export interface NetworkCapability {
@@ -30,11 +31,16 @@ export interface MediaMergeCapability {
   capability: 'media.merge';
 }
 
+export interface ClipboardCapability {
+  capability: 'clipboard.history';
+}
+
 export type PluginCapability =
   | NetworkCapability
   | DownloadCapability
   | BrowserLoginCapability
   | MediaMergeCapability
+  | ClipboardCapability
   | { capability: CapabilityType; [key: string]: any };
 
 export interface PluginEngines {
@@ -101,6 +107,16 @@ export interface DownloadProgressInfo {
   error?: string;
 }
 
+export interface ClipboardItem {
+  id: string;
+  text: string;
+  type: 'text';
+  timestamp: number;
+  charCount: number;
+  lineCount: number;
+  pinned: boolean;
+}
+
 export interface PluginContext {
   pluginId: string;
   version: string;
@@ -135,6 +151,16 @@ export interface DoujiaoSDK {
   auth: {
     requestLogin(domain: string): Promise<{ success: boolean; message?: string }>;
     getStatus(domain: string): Promise<{ loggedIn: boolean; nickname?: string }>;
+  };
+
+  /** 剪贴板历史管理 */
+  clipboard?: {
+    getHistory(): Promise<ClipboardItem[]>;
+    writeText(text: string): Promise<boolean>;
+    deleteItem(id: string): Promise<boolean>;
+    clearHistory(): Promise<boolean>;
+    togglePin(id: string): Promise<boolean>;
+    onChanged(callback: (items: ClipboardItem[]) => void): () => void;
   };
 
   /** 媒体处理能力（FFmpeg 受控执行） */

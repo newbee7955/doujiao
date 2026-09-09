@@ -54,6 +54,18 @@ interface ProxyConfigState {
   effectiveProxy: string
 }
 
+function getPluginEmoji(plugin: { id?: string; icon?: string }): string {
+  if (plugin.icon && !plugin.icon.includes('/')) return plugin.icon
+  const id = plugin.id || ''
+  if (id.includes('douyin')) return '🎵'
+  if (id.includes('bilibili')) return '📺'
+  if (id.includes('markdown')) return '📝'
+  if (id.includes('notepad')) return '🗒️'
+  if (id.includes('clipboard')) return '📋'
+  if (id.includes('browser')) return '🌐'
+  return '🧩'
+}
+
 export default function App(): JSX.Element {
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [marketPlugins, setMarketPlugins] = useState<MarketPlugin[]>([])
@@ -521,7 +533,7 @@ export default function App(): JSX.Element {
                     className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0 text-left"
                   >
                     <span className="text-base flex-shrink-0">
-                      {plugin.id.includes('douyin') ? '🎵' : plugin.id.includes('bilibili') ? '📺' : '🧩'}
+                      {getPluginEmoji(plugin)}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="leading-none truncate font-medium">{plugin.name}</div>
@@ -651,7 +663,7 @@ export default function App(): JSX.Element {
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <span className="text-3xl">
-                            {plugin.id.includes('douyin') ? '🎵' : plugin.id.includes('bilibili') ? '📺' : '🧩'}
+                            {getPluginEmoji(plugin)}
                           </span>
                           <div>
                             <h3 className="font-semibold text-white">{plugin.name}</h3>
@@ -794,7 +806,7 @@ export default function App(): JSX.Element {
                         >
                           <div className="flex items-center gap-3">
                             <span className="text-2xl">
-                              {p.id.includes('douyin') ? '🎵' : p.id.includes('bilibili') ? '📺' : '🧩'}
+                              {getPluginEmoji(p)}
                             </span>
                             <div>
                               <div className="text-sm font-semibold text-white flex items-center gap-2">
