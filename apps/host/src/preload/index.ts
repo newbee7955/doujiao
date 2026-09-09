@@ -25,6 +25,11 @@ const hostAPI = {
   installFFmpeg: () => ipcRenderer.invoke('host:ffmpeg:install'),
   selectFFmpegFile: () => ipcRenderer.invoke('host:ffmpeg:select-file'),
 
+  // 网络代理与 GitHub 连通性管理
+  getProxyStatus: () => ipcRenderer.invoke('host:proxy:get-status'),
+  setProxyConfig: (config: any) => ipcRenderer.invoke('host:proxy:set-config', config),
+  testGitHubConnectivity: () => ipcRenderer.invoke('host:proxy:test-github'),
+
   // 抖音鉴权管理
   getDouyinStatus: () => ipcRenderer.invoke('host:auth:douyin-status'),
   loginDouyin: () => ipcRenderer.invoke('host:auth:douyin-login'),

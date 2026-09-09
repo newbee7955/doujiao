@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, net } from 'electron'
 import { join, dirname } from 'path'
 import { existsSync, mkdirSync, copyFileSync, unlinkSync, createWriteStream } from 'fs'
 import { exec, spawn } from 'child_process'
@@ -195,32 +195,28 @@ export class FFmpegManager {
     return await this.getStatus()
   }
 
-  private downloadFile(fileUrl: string, destPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const parsed = new URL(fileUrl)
-      const mod = parsed.protocol === 'https:' ? https : http
-
-      const req = mod.get(fileUrl, { timeout: 10000 }, (res) => {
-        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          return this.downloadFile(res.headers.location, destPath).then(resolve).catch(reject)
-        }
-        if (!res.statusCode || res.statusCode !== 200) {
-          return reject(new Error(`HTTP ${res.statusCode}`))
-        }
-        const file = createWriteStream(destPath)
-        res.pipe(file)
-        file.on('finish', () => {
-          file.close()
-          resolve()
-        })
-        file.on('error', reject)
-      })
-
-      req.on('error', reject)
-      req.on('timeout', () => {
-        req.destroy()
-        reject(new Error('下载连接超时'))
-      })
+  private async downloadFile(fileUrl: string, destPath: string): Promise<void> {
+    const resp = await net.fetch(fileUrl, {
+      headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
+      signal: AbortSignal.timeout(60000)
+    })
+    if (!resp.ok) {
+      throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
+    }
+    const reader = resp.body?.getReader()
+    if (!reader) {
+      throw new Error('无法创建网络数据流')
+    }
+    const file = createWriteStream(destPath)
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      file.write(Buffer.from(value))
+    }
+    file.end()
+    await new Promise<void>((resolve, reject) => {
+      file.on('finish', () => resolve())
+      file.on('error', reject)
     })
   }
 

@@ -3,6 +3,7 @@ import { PluginViewContainerManager } from '../container/plugin-view'
 import { DownloadTaskManager } from '../tasks/download-manager'
 import { PluginManager } from '../plugins/plugin-manager'
 import { getDouyinLoginStatus, openDouyinLoginWindow } from '../auth/douyin-auth'
+import { ProxyManager, NetworkProxyConfig } from '../network/proxy-manager'
 
 export function registerHostIpc(mainWindow: BrowserWindow): void {
   const containerManager = PluginViewContainerManager.getInstance()
@@ -166,7 +167,22 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
     taskManager.openSaveDirectory()
   })
 
-  // 17. 窗口控制
+  // 17. 网络代理管理：获取当前代理状态与 GitHub 有效代理
+  ipcMain.handle('host:proxy:get-status', async () => {
+    return await ProxyManager.getInstance().getStatus()
+  })
+
+  // 18. 网络代理管理：保存并应用代理配置（系统代理 / 直连 / 自定义）
+  ipcMain.handle('host:proxy:set-config', async (_, config: Partial<NetworkProxyConfig>) => {
+    return await ProxyManager.getInstance().setConfig(config)
+  })
+
+  // 19. 网络代理管理：测试 GitHub 直连与连通性
+  ipcMain.handle('host:proxy:test-github', async () => {
+    return await ProxyManager.getInstance().testGitHubConnectivity()
+  })
+
+  // 20. 窗口控制
   ipcMain.handle('host:window:minimize', () => mainWindow.minimize())
   ipcMain.handle('host:window:maximize', () => {
     if (mainWindow.isMaximized()) {

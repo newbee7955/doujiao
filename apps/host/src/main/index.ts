@@ -6,6 +6,7 @@ import { setupSecurityGuards } from './security'
 import { PluginViewContainerManager } from './container/plugin-view'
 import { registerPluginIpcBridge } from './ipc/bridge'
 import { registerHostIpc } from './ipc/host-api'
+import { ProxyManager } from './network/proxy-manager'
 
 // 1. 必须在 app ready 之前声明自定义协议特权
 registerPluginScheme()
@@ -57,7 +58,10 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // 1. 初始化并应用网络代理策略（默认跟随系统代理，可关闭直连或自定义）
+  await ProxyManager.getInstance().init()
+
   // 2. 在 app ready 之后注册自定义协议处理器 (protocol.handle 依赖默认 session)
   registerPluginProtocol()
 

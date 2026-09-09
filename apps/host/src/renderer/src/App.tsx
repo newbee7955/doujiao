@@ -47,6 +47,13 @@ interface PermissionDiffModalData {
   addedHosts: string[]
 }
 
+interface ProxyConfigState {
+  mode: 'system' | 'direct' | 'custom'
+  customProxyUrl: string
+  bypassRules: string
+  effectiveProxy: string
+}
+
 export default function App(): JSX.Element {
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [marketPlugins, setMarketPlugins] = useState<MarketPlugin[]>([])
@@ -60,6 +67,22 @@ export default function App(): JSX.Element {
   const [installingPluginId, setInstallingPluginId] = useState<string | null>(null)
   const [ffmpegLoading, setFFmpegLoading] = useState(false)
   const [permissionModal, setPermissionModal] = useState<PermissionDiffModalData | null>(null)
+
+  // 网络代理配置状态 (默认跟随系统代理)
+  const [proxyConfig, setProxyConfig] = useState<ProxyConfigState>({
+    mode: 'system',
+    customProxyUrl: 'http://127.0.0.1:7890',
+    bypassRules: '<local>;localhost;127.0.0.1',
+    effectiveProxy: 'DIRECT'
+  })
+  const [savingProxy, setSavingProxy] = useState(false)
+  const [testingProxy, setTestingProxy] = useState(false)
+  const [testResult, setTestResult] = useState<{
+    success: boolean
+    latencyMs?: number
+    effectiveProxy: string
+    error?: string
+  } | null>(null)
 
   // 1. 加载本地与已安装插件
   const fetchPlugins = async () => {
@@ -107,11 +130,22 @@ export default function App(): JSX.Element {
     }
   }
 
+  // 5. 获取网络代理设置与当前 GitHub 连通有效代理
+  const fetchProxyConfig = async () => {
+    if (window.hostAPI?.getProxyStatus) {
+      try {
+        const res = await window.hostAPI.getProxyStatus()
+        if (res) setProxyConfig(res)
+      } catch {}
+    }
+  }
+
   useEffect(() => {
     fetchPlugins()
     fetchMarket()
     checkFFmpeg()
     checkDouyinStatus()
+    fetchProxyConfig()
   }, [])
 
   // 监听 Tab 切换挂载/隐藏沙箱插件
@@ -258,6 +292,60 @@ export default function App(): JSX.Element {
       setInstallMsg({ text: `卸载异常: ${err?.message}`, type: 'error' })
     } finally {
       setTimeout(() => setInstallMsg(null), 4000)
+    }
+  }
+
+  // 网络代理切换与保存
+  const handleUpdateProxyMode = async (mode: 'system' | 'direct' | 'custom') => {
+    const updated = { ...proxyConfig, mode }
+    setProxyConfig(updated)
+    await handleSaveProxyConfig(updated)
+  }
+
+  const handleSaveProxyConfig = async (configToSave = proxyConfig) => {
+    if (!window.hostAPI?.setProxyConfig) return
+    setSavingProxy(true)
+    try {
+      const res = await window.hostAPI.setProxyConfig({
+        mode: configToSave.mode,
+        customProxyUrl: configToSave.customProxyUrl,
+        bypassRules: configToSave.bypassRules
+      })
+      if (res) {
+        setProxyConfig(res)
+        setInstallMsg({
+          text: `网络代理已切换为【${
+            res.mode === 'system'
+              ? '跟随系统代理 (默认)'
+              : res.mode === 'direct'
+              ? '关闭代理 (直连 GitHub)'
+              : '自定义代理'
+          }】！`,
+          type: 'success'
+        })
+      }
+    } catch (err: any) {
+      setInstallMsg({ text: `保存代理设置失败: ${err?.message}`, type: 'error' })
+    } finally {
+      setSavingProxy(false)
+      setTimeout(() => setInstallMsg(null), 4000)
+    }
+  }
+
+  const handleTestGitHub = async () => {
+    if (!window.hostAPI?.testGitHubConnectivity) return
+    setTestingProxy(true)
+    setTestResult(null)
+    try {
+      const res = await window.hostAPI.testGitHubConnectivity()
+      setTestResult(res)
+      if (res?.effectiveProxy) {
+        setProxyConfig((prev) => ({ ...prev, effectiveProxy: res.effectiveProxy }))
+      }
+    } catch (err: any) {
+      setTestResult({ success: false, effectiveProxy: 'DIRECT', error: err?.message || '请求超时' })
+    } finally {
+      setTestingProxy(false)
     }
   }
 
@@ -707,6 +795,159 @@ export default function App(): JSX.Element {
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* 网络代理与 GitHub 连通配置 */}
+                <div className="space-y-3 pb-5 border-b border-slate-800">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-white flex items-center gap-2">
+                        <span>网络代理与 GitHub 连通配置</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-mono ${
+                            proxyConfig.mode === 'direct'
+                              ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                              : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          }`}
+                        >
+                          {proxyConfig.mode === 'system'
+                            ? '跟随系统代理 (默认)'
+                            : proxyConfig.mode === 'direct'
+                            ? '关闭代理 (纯直连)'
+                            : '自定义代理'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        插件市场与发布包已全面直连 GitHub 官方源（无国内第三方镜像）。默认使用系统代理，可在不需要时一键关闭。
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-1 flex items-center gap-2">
+                        <span>GitHub 有效链路:</span>
+                        <span className="text-slate-300 bg-slate-950/80 px-2 py-0.5 rounded border border-slate-800">
+                          {proxyConfig.effectiveProxy || 'DIRECT'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleTestGitHub}
+                      disabled={testingProxy}
+                      className="px-3.5 py-1.5 text-xs rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium shadow-md shadow-indigo-600/20 transition-all flex items-center gap-1.5"
+                    >
+                      <span>{testingProxy ? '⏳ 检测中...' : '⚡ 测试 GitHub 连通性'}</span>
+                    </button>
+                  </div>
+
+                  {/* 模式单选控制 */}
+                  <div className="grid grid-cols-3 gap-2.5">
+                    <label
+                      onClick={() => handleUpdateProxyMode('system')}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        proxyConfig.mode === 'system'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="proxyMode"
+                        checked={proxyConfig.mode === 'system'}
+                        onChange={() => handleUpdateProxyMode('system')}
+                        className="text-emerald-500 focus:ring-0"
+                      />
+                      <div>
+                        <div className="text-xs font-semibold text-white">跟随系统代理 (默认)</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">自动同步系统 Clash / VPN / 局域网代理</div>
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => handleUpdateProxyMode('direct')}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        proxyConfig.mode === 'direct'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="proxyMode"
+                        checked={proxyConfig.mode === 'direct'}
+                        onChange={() => handleUpdateProxyMode('direct')}
+                        className="text-emerald-500 focus:ring-0"
+                      />
+                      <div>
+                        <div className="text-xs font-semibold text-white">关闭代理 (纯直连)</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">禁用所有代理规则，直接请求 GitHub</div>
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => handleUpdateProxyMode('custom')}
+                      className={`flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        proxyConfig.mode === 'custom'
+                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-950/40 border-slate-800 hover:border-slate-700 text-slate-400'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="proxyMode"
+                        checked={proxyConfig.mode === 'custom'}
+                        onChange={() => handleUpdateProxyMode('custom')}
+                        className="text-emerald-500 focus:ring-0"
+                      />
+                      <div>
+                        <div className="text-xs font-semibold text-white">自定义代理地址</div>
+                        <div className="text-[10px] text-slate-500 mt-0.5">手动指定 HTTP / SOCKS5 代理端口</div>
+                      </div>
+                    </label>
+                  </div>
+
+                  {/* 自定义代理输入框（当选择自定义代理时显示） */}
+                  {proxyConfig.mode === 'custom' && (
+                    <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <label className="text-[11px] text-slate-400 block mb-1">代理服务器地址 (HTTP / SOCKS5)</label>
+                          <input
+                            type="text"
+                            value={proxyConfig.customProxyUrl}
+                            onChange={(e) => setProxyConfig({ ...proxyConfig, customProxyUrl: e.target.value })}
+                            placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                            className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-600 focus:border-emerald-500 focus:outline-none font-mono"
+                          />
+                        </div>
+                        <button
+                          onClick={() => handleSaveProxyConfig()}
+                          disabled={savingProxy}
+                          className="mt-5 px-4 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-medium transition-colors"
+                        >
+                          {savingProxy ? '保存中...' : '保存代理'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 连通性测试结果提示 */}
+                  {testResult && (
+                    <div
+                      className={`p-3 rounded-xl border text-xs flex items-center justify-between ${
+                        testResult.success
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{testResult.success ? '✓' : '✕'}</span>
+                        <span>
+                          {testResult.success
+                            ? `GitHub 官方源连通正常！响应延迟: ${testResult.latencyMs}ms (通过 ${testResult.effectiveProxy})`
+                            : `连接失败: ${testResult.error} (请检查系统代理或切换模式)`}
+                        </span>
+                      </div>
+                      <button onClick={() => setTestResult(null)} className="text-slate-400 hover:text-white">✕</button>
                     </div>
                   )}
                 </div>

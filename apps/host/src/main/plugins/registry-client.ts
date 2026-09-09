@@ -57,11 +57,8 @@ export interface MarketPluginView {
   isDev?: boolean
 }
 
-const REMOTE_REGISTRY_MIRRORS = [
-  'https://raw.gitmirror.com/newbee7955/doujiao/main/registry/plugins-registry.json',
-  'https://ghproxy.net/https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json',
+const GITHUB_OFFICIAL_REGISTRY_URL =
   'https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json'
-]
 
 export class RegistryClient {
   private static instance: RegistryClient
@@ -125,28 +122,29 @@ export class RegistryClient {
       return localData
     }
 
-    // 2. 尝试从多镜像 CDN 同步最新远端索引 (每个镜像 2.5s 超时)
-    for (const mirrorUrl of REMOTE_REGISTRY_MIRRORS) {
-      try {
-        const resp = await net.fetch(mirrorUrl, {
-          headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
-          signal: AbortSignal.timeout(2500)
-        })
-        if (resp.ok) {
-          const data = (await resp.json()) as RegistryData
-          if (data && Array.isArray(data.plugins)) {
-            this.cachedRegistry = data
-            this.lastFetchTime = now
-            console.log(`[RegistryClient] Synced registry successfully from mirror: ${mirrorUrl}`)
-            return data
-          }
+    // 2. 直连 GitHub 官方仓库拉取最新插件市场索引（遵循系统代理或用户设定的代理）
+    try {
+      console.log(`[RegistryClient] 直连 GitHub 官方源拉取市场索引: ${GITHUB_OFFICIAL_REGISTRY_URL}`)
+      const resp = await net.fetch(GITHUB_OFFICIAL_REGISTRY_URL, {
+        headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
+        signal: AbortSignal.timeout(10000)
+      })
+      if (resp.ok) {
+        const data = (await resp.json()) as RegistryData
+        if (data && Array.isArray(data.plugins)) {
+          this.cachedRegistry = data
+          this.lastFetchTime = now
+          console.log(`[RegistryClient] ✓ 成功直连 GitHub 同步最新插件索引 (版本: ${data.registryVersion})`)
+          return data
         }
-      } catch {
-        // 继续尝试下一个镜像
+      } else {
+        console.warn(`[RegistryClient] GitHub 响应状态非 200: HTTP ${resp.status}`)
       }
+    } catch (err: any) {
+      console.warn(`[RegistryClient] 直连 GitHub 获取索引异常 (${err?.message})，将回退使用本地缓存`)
     }
 
-    // 3. 远端均不可用时，使用本地已知最新清单
+    // 3. 远端网络不可用时，使用本地已知最新清单
     if (localData) {
       this.cachedRegistry = localData
       this.lastFetchTime = now
@@ -253,16 +251,12 @@ export class RegistryClient {
     }
 
     if (!downloaded) {
-      const downloadUrls = [
-        artifact.url,
-        `https://ghproxy.net/${artifact.url}`
-      ]
+      console.log(`[RegistryClient] 直连 GitHub 下载插件发布包: ${artifact.url}`)
       let resp: any = null
-      for (const dUrl of downloadUrls) {
-        try {
-          resp = await net.fetch(dUrl, { signal: AbortSignal.timeout(15000) })
-          if (resp && resp.ok) break
-        } catch {}
+      try {
+        resp = await net.fetch(artifact.url, { signal: AbortSignal.timeout(60000) })
+      } catch (err: any) {
+        throw new Error(`连接 GitHub 下载失败 (${err?.message})。请检查系统代理设置是否开启。`)
       }
 
       if (!resp || !resp.ok) {
