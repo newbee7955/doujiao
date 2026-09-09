@@ -1,7 +1,7 @@
 {
   "name": "@doujiao/host",
   "version": "0.2.0",
-  "description": "豆角工具箱 - 纯净微内核宿主",
+  "description": "豆角工具箱 - 极简模块化多功能桌面工具箱",
   "author": "Doujiao Team",
   "main": "./out/main/index.js",
   "private": true,

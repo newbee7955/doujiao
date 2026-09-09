@@ -100,6 +100,9 @@ async function packagePlugin(pluginRelativeDir) {
       releases: []
     };
     registryData.plugins.push(pluginEntry);
+  } else {
+    pluginEntry.name = manifest.name || pluginEntry.name;
+    pluginEntry.description = manifest.description || pluginEntry.description;
   }
 
   // 构建 release 记录

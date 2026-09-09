@@ -105,7 +105,7 @@ export default function App(): JSX.Element {
     }
 
     setPushing(true)
-    setMsg({ text: `正在提取 ${selectedPages.length} 个选集的流地址并提交宿主...`, type: 'info' })
+    setMsg({ text: `正在提取 ${selectedPages.length} 个选集的流地址并开始下载...`, type: 'info' })
 
     const sdk = getSDK()
     let ffmpegAvailable = hasFFmpeg
@@ -152,7 +152,7 @@ export default function App(): JSX.Element {
 
     setPushing(false)
     setMsg({
-      text: `已成功推入 ${successCount} 个视频至宿主后台下载队列！`,
+      text: `已成功推入 ${successCount} 个视频至后台下载队列！`,
       type: 'success'
     })
   }
@@ -171,11 +171,11 @@ export default function App(): JSX.Element {
                 B站视频/多P选集下载器
               </h1>
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-400 border border-pink-500/20 font-mono">
-                官方沙箱插件 v1.0.0
+                官方插件 v1.0.0
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              支持单视频、多P合集、连载课程，自动提取最高码率并调用宿主 FFmpeg 无损混流
+              支持单视频、多P合集、连载课程，自动提取最高码率并进行无损混流
             </p>
           </div>
         </div>
@@ -209,7 +209,7 @@ export default function App(): JSX.Element {
         <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span>💡</span>
-            <span>当前宿主未检测到 FFmpeg，已自动启用免混流单文件下载模式（480P/720P）；如需下载 1080P+/4K 高清，可前往宿主「设置」一键安装 FFmpeg。</span>
+            <span>当前未检测到 FFmpeg，已自动启用免混流单文件下载模式（480P/720P）；如需下载 1080P+/4K 高清，可前往「应用设置」一键安装 FFmpeg。</span>
           </div>
         </div>
       )}
@@ -341,12 +341,12 @@ export default function App(): JSX.Element {
         </div>
       )}
 
-      {/* 实时下载动态监控 (来自宿主任务引擎) */}
+      {/* 实时下载动态监控 */}
       {recentTasks.length > 0 && (
         <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800 space-y-2.5">
           <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
-            <span>📥 当前下载进度 (宿主后台持有)</span>
-            <span className="text-[11px] text-emerald-400 font-mono">微内核长效任务</span>
+            <span>📥 当前下载进度</span>
+            <span className="text-[11px] text-emerald-400 font-mono">后台下载中</span>
           </div>
 
           <div className="space-y-2">

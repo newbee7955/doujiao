@@ -245,7 +245,7 @@ export default function App(): JSX.Element {
       const res = await window.hostAPI.installMarketPlugin(plugin.id, plugin.latestVersion)
       if (res.success) {
         setInstallMsg({
-          text: `插件【${plugin.name}】v${plugin.latestVersion} 已通过 Ed25519 双重验签并完成安装！`,
+          text: `插件【${plugin.name}】v${plugin.latestVersion} 安装成功！`,
           type: 'success'
         })
         await fetchPlugins()
@@ -458,7 +458,7 @@ export default function App(): JSX.Element {
             豆角工具箱 Doujiao
           </span>
           <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 ml-2">
-            V2.0 微内核沙箱
+            V2.0 官方版
           </span>
         </div>
 
@@ -541,10 +541,8 @@ export default function App(): JSX.Element {
                       <div className="leading-none truncate font-medium">{plugin.name}</div>
                       <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5">
                         <span>v{plugin.version}</span>
-                        {plugin.isDev ? (
-                          <span className="text-amber-400/80">(Dev)</span>
-                        ) : (
-                          <span className="text-emerald-400/80">(沙箱)</span>
+                        {plugin.isDev && (
+                          <span className="text-amber-400/80">(开发版)</span>
                         )}
                       </div>
                     </div>
@@ -591,15 +589,15 @@ export default function App(): JSX.Element {
               }`}
             >
               <span className="text-base">⚙️</span>
-              <span>宿主设置</span>
+              <span>应用设置</span>
             </button>
           </div>
 
           {/* 底部信息 */}
           <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] text-slate-500 space-y-1">
             <div className="flex justify-between">
-              <span>微内核机制</span>
-              <span className="text-emerald-400 font-mono">Ed25519 验签</span>
+              <span>安全机制</span>
+              <span className="text-emerald-400 font-mono">官方认证</span>
             </div>
             <div className="flex justify-between">
               <span>FFmpeg 组件</span>
@@ -635,7 +633,7 @@ export default function App(): JSX.Element {
                 <div>
                   <h1 className="text-2xl font-bold text-white">官方插件市场</h1>
                   <p className="text-sm text-slate-400 mt-1">
-                    官方签名认证（SHA-256 + Ed25519 双重验签），无特权沙箱隔离运行
+                    经过官方安全认证，即点即装，纯净轻量无干扰
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -766,9 +764,9 @@ export default function App(): JSX.Element {
           {activeTab === 'settings' && (
             <div className="max-w-2xl mx-auto space-y-6">
               <div>
-                <h1 className="text-2xl font-bold text-white">宿主设置</h1>
+                <h1 className="text-2xl font-bold text-white">应用设置</h1>
                 <p className="text-sm text-slate-400 mt-1">
-                  管理微内核底层通用参数、FFmpeg 共享多媒体组件与凭证隔离
+                  管理应用通用参数、多媒体组件与数据存储
                 </p>
               </div>
 
@@ -784,7 +782,7 @@ export default function App(): JSX.Element {
                         </span>
                       </div>
                       <div className="text-xs text-slate-400 mt-0.5">
-                        查看宿主已挂载的插件生命周期、沙箱隔离状态，支持一键安全彻底卸载
+                        查看已安装扩展插件的运行状态，支持一键安全卸载
                       </div>
                     </div>
                     <button
@@ -797,7 +795,7 @@ export default function App(): JSX.Element {
 
                   {plugins.length === 0 ? (
                     <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-center text-xs text-slate-500">
-                      当前宿主处于纯净微内核状态，暂无已安装插件
+                      当前暂无已安装插件，可前往插件市场按需下载
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -815,9 +813,9 @@ export default function App(): JSX.Element {
                                 <span>{p.name}</span>
                                 <span className="text-xs font-mono text-slate-400">v{p.version}</span>
                                 {p.isDev ? (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">Dev</span>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">开发版</span>
                                 ) : (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">沙箱隔离</span>
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">已就绪</span>
                                 )}
                               </div>
                               <div className="text-xs text-slate-500 font-mono mt-0.5">{p.id}</div>
@@ -1047,7 +1045,7 @@ export default function App(): JSX.Element {
                 <div className="border-t border-slate-800 pt-4 flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium text-white">统一文件下载存储</div>
-                    <div className="text-xs text-slate-400 mt-0.5">所有沙箱插件推入的任务均统一保存在宿主集中目录</div>
+                    <div className="text-xs text-slate-400 mt-0.5">所有插件下载的文件均保存在该目录中</div>
                   </div>
                   <button
                     onClick={() => window.hostAPI?.openDownloadDir()}
@@ -1063,7 +1061,7 @@ export default function App(): JSX.Element {
                     <div className="text-sm font-medium text-white">抖音网页端隔离会话</div>
                     <div className="text-xs text-slate-400 mt-0.5">
                       {douyinLoggedIn ? (
-                        <span className="text-emerald-400">✓ 已捕获有效凭证（自动附加安全 ttwid，插件无法获取明文 Cookie）</span>
+                        <span className="text-emerald-400">✓ 已捕获有效凭证（自动附加安全凭据，保护账户隐私）</span>
                       ) : (
                         <span className="text-amber-400">未检测到登录凭证，部分高清视频与合集可能受限</span>
                       )}
@@ -1077,16 +1075,16 @@ export default function App(): JSX.Element {
                   </button>
                 </div>
 
-                {/* 沙箱安全 */}
+                {/* 安全防护 */}
                 <div className="border-t border-slate-800 pt-4 flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-medium text-white">微内核安全架构基线</div>
+                    <div className="text-sm font-medium text-white">应用运行与安全防护</div>
                     <div className="text-xs text-slate-400 mt-0.5">
-                      强制 WebContentsView 进程隔离、CSP 脚本阻断、Ed25519 签名与不可变目录版本指针
+                      独立进程运行、网络安全防护、防篡改数字签名与独立数据存储
                     </div>
                   </div>
                   <span className="text-xs font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                    双重密码学保护中
+                    安全保护已开启
                   </span>
                 </div>
               </div>

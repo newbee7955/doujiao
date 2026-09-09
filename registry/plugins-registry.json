@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 21,
-  "updatedAt": "2026-09-09T15:15:23.602Z",
+  "registryVersion": 26,
+  "updatedAt": "2026-09-09T15:24:57.916Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -13,7 +13,7 @@
         {
           "version": "1.2.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T08:26:13.285Z",
+          "publishedAt": "2026-09-09T15:24:57.878Z",
           "changelog": "官方发布版本 v1.2.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -45,9 +45,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/douyin-downloader-v1.2.0.zip",
-              "size": 59218,
-              "sha256": "63ec9b0033c69963f4b8e36d964e308f8d70ced3fafef6c3eb860842bdbd376d",
-              "signature": "WUofFTdUDluXOeTPhWtkFwviLj59o2MdII8yyN4WG3I0A95D853Kg912v/LGce6RzvTo2LOHOgPnnGpdfXNPBw=="
+              "size": 59153,
+              "sha256": "0b5c01bb409b39c335d4021b82f18e332e41cb0b4218b686dc37766f74f60fc3",
+              "signature": "WTZqyDdK34lOLjxaUdVBkNpvKn7YemEsWZwD2r8QV52T1kKYrWgaZBGvY2mZG7vcqc4QBQi1j7heMkBZ3CjZDw=="
             }
           ]
         }
@@ -63,7 +63,7 @@
         {
           "version": "1.0.1",
           "channel": "stable",
-          "publishedAt": "2026-09-09T10:11:13.990Z",
+          "publishedAt": "2026-09-09T15:24:57.841Z",
           "changelog": "官方发布版本 v1.0.1",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -101,9 +101,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/bilibili-downloader-v1.0.1.zip",
-              "size": 55637,
-              "sha256": "8428718bc04345e8de9df1b45e06077ec2eb2bcff77ce9b54d7888ca37a049e1",
-              "signature": "Uw8zptX952sd0ovnDqwG9Cat2kuENZ/UzWwfhnOtWAEDROOGIJbgSP2mVTzBXVKxjUKYbl5JmSO11NvC7xKbBA=="
+              "size": 55599,
+              "sha256": "1871699ec63d48895466e838241917bb6ab167d1bcd3560fd0e684e8b9287fca",
+              "signature": "4CtOzkNr4itlw9BqN8iqWpLtQtrycIfEMd3vstgdcx14uSo0gp+QeA+nfrby9dooACoOIRRKkfhGaQGDXgMXBA=="
             }
           ]
         },
@@ -166,7 +166,7 @@
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T11:02:50.626Z",
+          "publishedAt": "2026-09-09T15:24:57.892Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -178,9 +178,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/markdown-editor-v1.0.0.zip",
-              "size": 57264,
-              "sha256": "5b013ed7ae75e2da827ec982f3598f42f1feb5f318b9de61b2cbdee56fef08f1",
-              "signature": "MXStyRFzdi0nNt+Nk2EHJKxOuOCcFvufzEOH+QKA7U6P4VZIO5tLJzzFdK6/3V9VL0yYsBIq10oQjZXzliPDAA=="
+              "size": 57242,
+              "sha256": "9f2db55b50b86bc6c9a25b7a172533d286c3db1e1ee7c2a264d570f40b0da2d9",
+              "signature": "ToLvq39GXPgmpHn01sF06cAeZkS5zeAbrqAFq2ekJ6/JIQM5sedarEUaf4jvxnJUO9T7AXYahcT9swC9ggHrCg=="
             }
           ]
         }
@@ -226,7 +226,7 @@
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T11:02:50.979Z",
+          "publishedAt": "2026-09-09T15:24:57.903Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -242,9 +242,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/clipboard-history-v1.0.0.zip",
-              "size": 54084,
-              "sha256": "e1fc3209dc89e54c00765b39758b1689d88256cbb3aa6d5f490fedb4aadc9565",
-              "signature": "/W7C7p+7lcXYQtlqB9d/QBFJ0Bdvk095+63xbkZNS02W7q4QMxQjNK0wnplOjLucxd0HeSWeVhzYzmxKruX6Dw=="
+              "size": 54085,
+              "sha256": "220e2c8d3df7704b41e4bddfe7a4255bafcd9ed03ff89d70af6d87d324e3b142",
+              "signature": "bIjJQT2ySvX784jXWEoHJW/jOz4NgdQl8FyKWgdWeCcR+mAziUWuM+wamGhwckJBHmjLfQc0tXA/kLWh1+0dAQ=="
             }
           ]
         }
@@ -253,14 +253,14 @@
     {
       "id": "browser",
       "publisher": "doujiao-official",
-      "name": "内置隔离浏览器",
-      "description": "基于独立会话沙箱的多标签极速浏览器，支持智能搜索寻址、书签收藏、导航控制及存储隔离",
+      "name": "内置极速浏览器",
+      "description": "基于独立会话的多标签极速浏览器，支持智能搜索寻址、书签收藏、导航控制及存储隔离",
       "icon": "🌐",
       "releases": [
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T11:02:51.142Z",
+          "publishedAt": "2026-09-09T15:24:57.916Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -279,9 +279,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/browser-v1.0.0.zip",
-              "size": 54522,
-              "sha256": "f288e167b35d5294aea99c326e99aa6b2c7fbaac6f8ff5e24bb0b3433e80a73e",
-              "signature": "CtjhU0bC4JnxtXu/R04hQxAUH6pawGssYYkN3z76l1iUCj3NVdffpzbelmYFjmifdX+toI+f3ooZtD4rOsbHBw=="
+              "size": 54515,
+              "sha256": "6ec09723f422e073bc8cdb47755349ea16231ba2575e478c447d8b97ddeaba18",
+              "signature": "ZQS45ZkrivtKUyqI5U2DEFvGaqSKJozXDoMao8Yc/JIIlP0CNhJXcjNFSyZQGU79jcsMk58LXHugtXVJ8ai8BQ=="
             }
           ]
         }

@@ -163,7 +163,7 @@ export default function App(): JSX.Element {
         count++
       }
 
-      showNotice(`已成功将 ${count} 个视频提交给宿主下载中心！`)
+      showNotice(`已成功将 ${count} 个视频提交到下载中心！`)
     } catch (err: any) {
       showNotice(`提交下载出错: ${err?.message}`)
     }
@@ -265,9 +265,9 @@ export default function App(): JSX.Element {
                 抖音视频 / 合集 / 创作者批量下载
               </h2>
               <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                <span>官方沙箱插件</span>
+                <span>官方插件</span>
                 <span>•</span>
-                <span className="text-emerald-400 font-mono">v1.2.0 (独立受控生命周期)</span>
+                <span className="text-emerald-400 font-mono">v1.2.0</span>
               </div>
             </div>
           </div>
@@ -637,7 +637,7 @@ export default function App(): JSX.Element {
         {Object.keys(tasksProgress).length > 0 && (
           <div className="space-y-3 pt-4 border-t border-slate-800">
             <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
-              <span>本插件活动下载进度 (由宿主主进程持久持有)：</span>
+              <span>活动下载进度：</span>
               <button
                 onClick={() => setTasksProgress({})}
                 className="text-[11px] text-slate-500 hover:text-slate-300"

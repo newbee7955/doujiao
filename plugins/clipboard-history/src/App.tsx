@@ -280,7 +280,7 @@ export default function App(): JSX.Element {
       {/* 历史卡片列表 */}
       <div className="flex-1 overflow-y-auto p-6 space-y-3">
         {loading ? (
-          <div className="text-center py-20 text-slate-500 text-xs">正在连接宿主剪贴板监视器...</div>
+          <div className="text-center py-20 text-slate-500 text-xs">正在连接剪贴板监视器...</div>
         ) : filteredItems.length === 0 ? (
           <div className="text-center py-20 text-slate-500 text-xs space-y-2">
             <div className="text-3xl">📭</div>

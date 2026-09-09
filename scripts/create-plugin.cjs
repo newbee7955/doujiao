@@ -245,7 +245,7 @@ export default function App(): JSX.Element {
           <span className="text-3xl">${icon}</span>
           <div>
             <h1 className="text-xl font-bold text-white">${finalName}</h1>
-            <p className="text-xs text-slate-400 mt-0.5">运行于微内核独立沙箱容器中，由宿主代理网络与下载</p>
+            <p className="text-xs text-slate-400 mt-0.5">扩展应用功能，由主程序安全协同管理</p>
           </div>
         </div>
 
