@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 6,
-  "updatedAt": "2026-09-09T09:43:37.507Z",
+  "registryVersion": 7,
+  "updatedAt": "2026-09-09T10:11:13.990Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -60,6 +60,53 @@
       "description": "支持 B 站高清视频解析、分P/连载选集批量提取，内置独立音视频流自动混流",
       "icon": "assets/icon.png",
       "releases": [
+        {
+          "version": "1.0.1",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T10:11:13.990Z",
+          "changelog": "官方发布版本 v1.0.1",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "network.request",
+              "hosts": [
+                "api.bilibili.com",
+                "www.bilibili.com",
+                "b23.tv",
+                "*.bilivideo.com",
+                "*.hdslb.com"
+              ],
+              "methods": [
+                "GET",
+                "POST"
+              ]
+            },
+            {
+              "capability": "download.enqueue",
+              "formats": [
+                "mp4",
+                "m4s",
+                "flv"
+              ]
+            },
+            {
+              "capability": "media.merge"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/bilibili-downloader-v1.0.1/bilibili-downloader-v1.0.1.zip",
+              "size": 55637,
+              "sha256": "8428718bc04345e8de9df1b45e06077ec2eb2bcff77ce9b54d7888ca37a049e1",
+              "signature": "Uw8zptX952sd0ovnDqwG9Cat2kuENZ/UzWwfhnOtWAEDROOGIJbgSP2mVTzBXVKxjUKYbl5JmSO11NvC7xKbBA=="
+            }
+          ]
+        },
         {
           "version": "1.0.0",
           "channel": "stable",

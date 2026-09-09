@@ -41,6 +41,9 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
 
     try {
       const result = await pluginManager.installFromZip(res.filePaths[0])
+      if (result.pluginId) {
+        containerManager.destroyPluginView(result.pluginId)
+      }
       return result
     } catch (err: any) {
       console.error('[HostApi] 安装插件失败:', err)
@@ -66,6 +69,7 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
     'host:registry:install',
     async (_, { pluginId, version }: { pluginId: string; version?: string }) => {
       try {
+        containerManager.destroyPluginView(pluginId)
         const { RegistryClient } = await import('../plugins/registry-client')
         const res = await RegistryClient.getInstance().installFromRegistry(pluginId, version)
         return res
@@ -87,6 +91,7 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
     'host:updates:apply',
     async (_, { pluginId, version }: { pluginId: string; version?: string }) => {
       try {
+        containerManager.destroyPluginView(pluginId)
         const { RegistryClient } = await import('../plugins/registry-client')
         const res = await RegistryClient.getInstance().installFromRegistry(pluginId, version)
         return res

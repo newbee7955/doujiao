@@ -3,7 +3,7 @@
   "id": "bilibili-downloader",
   "publisher": "doujiao-official",
   "name": "B站视频/多P选集下载器",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "支持 B 站高清视频解析、分P/连载选集批量提取，内置独立音视频流自动混流",
   "icon": "assets/icon.png",
   "engines": {
