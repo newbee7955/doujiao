@@ -65,6 +65,10 @@ export interface MarketFetchResult {
 }
 
 const GITHUB_OFFICIAL_REGISTRY_URLS = [
+  'https://cdn.jsdelivr.net/gh/newbee7955/doujiao@main/registry/plugins-registry.json',
+  'https://fastly.jsdelivr.net/gh/newbee7955/doujiao@main/registry/plugins-registry.json',
+  'https://gcore.jsdelivr.net/gh/newbee7955/doujiao@main/registry/plugins-registry.json',
+  'https://ghproxy.net/https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json',
   'https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/plugins-registry.json',
   'https://github.com/newbee7955/doujiao/raw/main/registry/plugins-registry.json'
 ]
@@ -96,6 +100,8 @@ export class RegistryClient {
    */
   private loadLocalRegistry(): RegistryData | null {
     const candidates = [
+      resolve(process.resourcesPath || '', 'registry/plugins-registry.json'),
+      resolve(process.resourcesPath || '', 'plugins-registry.json'),
       resolve(process.cwd(), 'registry/plugins-registry.json'),
       resolve(app.getAppPath(), '../../registry/plugins-registry.json'),
       resolve(app.getAppPath(), '../registry/plugins-registry.json'),
@@ -257,9 +263,11 @@ export class RegistryClient {
     console.log(`\n[RegistryClient] 开始下载插件: ${pluginId}@${release.version}`)
     console.log(`[RegistryClient] 下载来源: ${artifact.url}`)
 
-    // 1. 如果本地开发已有生成好的 release 包，优先使用本地包提速；否则通过网络下载
+    // 1. 如果本地开发或安装包内已有预置的 release 包，优先使用本地包提速 (0ms 离线安装)
     let downloaded = false
     const localReleaseCandidates = [
+      resolve(process.resourcesPath || '', 'registry/releases', zipFileName),
+      resolve(process.resourcesPath || '', 'releases', zipFileName),
       resolve(process.cwd(), 'registry/releases', zipFileName),
       resolve(app.getAppPath(), '../../registry/releases', zipFileName),
       resolve(app.getAppPath(), '../registry/releases', zipFileName),
@@ -271,14 +279,20 @@ export class RegistryClient {
         const fs = await import('fs')
         fs.writeFileSync(targetZipPath, buf)
         downloaded = true
-        console.log(`[RegistryClient] Using local release archive: ${localZip}`)
+        console.log(`[RegistryClient] Using local/bundled release archive: ${localZip}`)
         break
       }
     }
 
     if (!downloaded) {
+      // 2. 配置多级全球/国内高速 CDN 加速镜像源 (秒级下载)，备选直连 GitHub
       const candidateUrls = Array.from(
         new Set([
+          `https://cdn.jsdelivr.net/gh/newbee7955/doujiao@main/registry/releases/${zipFileName}`,
+          `https://fastly.jsdelivr.net/gh/newbee7955/doujiao@main/registry/releases/${zipFileName}`,
+          `https://gcore.jsdelivr.net/gh/newbee7955/doujiao@main/registry/releases/${zipFileName}`,
+          `https://testingcf.jsdelivr.net/gh/newbee7955/doujiao@main/registry/releases/${zipFileName}`,
+          `https://ghproxy.net/https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/${zipFileName}`,
           artifact.url,
           `https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/${zipFileName}`,
           `https://github.com/newbee7955/doujiao/raw/main/registry/releases/${zipFileName}`
@@ -289,13 +303,13 @@ export class RegistryClient {
       let fetchSuccess = false
 
       for (const downloadUrl of candidateUrls) {
-        console.log(`[RegistryClient] 直连 GitHub 尝试下载插件包: ${downloadUrl}`)
+        console.log(`[RegistryClient] 尝试下载插件包: ${downloadUrl}`)
         try {
           const resp = await net.fetch(downloadUrl, {
             headers: {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Doujiao-Host/0.2.0'
             },
-            signal: AbortSignal.timeout(60000)
+            signal: AbortSignal.timeout(20000)
           })
 
           if (resp && resp.ok) {
