@@ -1,11 +1,10 @@
 import { app, net } from 'electron'
 import { join, dirname } from 'path'
-import { existsSync, mkdirSync, copyFileSync, unlinkSync, createWriteStream } from 'fs'
+import { existsSync, mkdirSync, copyFileSync, unlinkSync, createWriteStream, renameSync } from 'fs'
 import { exec, spawn } from 'child_process'
 import { promisify } from 'util'
-import https from 'https'
-import http from 'http'
-import { URL } from 'url'
+import zlib from 'zlib'
+import { once } from 'events'
 
 const execAsync = promisify(exec)
 
@@ -15,6 +14,12 @@ export interface FFmpegStatus {
   path?: string
   source: 'builtin' | 'system' | 'custom' | 'none'
   error?: string
+}
+
+export interface FFmpegInstallProgress {
+  percent: number
+  speed?: string
+  text?: string
 }
 
 export class FFmpegManager {
@@ -65,15 +70,23 @@ export class FFmpegManager {
     }
 
     // 2. 检测 userData 独立共享池路径: userData/bin/ffmpeg/.../ffmpeg.exe
-    const builtinPath = this.getTargetExecutablePath()
-    if (existsSync(builtinPath)) {
-      const ver = await this.queryVersion(builtinPath)
-      if (ver) {
-        return {
-          installed: true,
-          version: ver,
-          path: builtinPath,
-          source: 'builtin'
+    const exeName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg'
+    const builtinCandidates = [
+      this.getTargetExecutablePath(),
+      join(app.getPath('userData'), 'bin', 'ffmpeg', '7.0.1', `${process.platform}-${process.arch}`, exeName),
+      join(app.getPath('userData'), 'bin', 'ffmpeg', exeName)
+    ]
+
+    for (const builtinPath of builtinCandidates) {
+      if (existsSync(builtinPath)) {
+        const ver = await this.queryVersion(builtinPath)
+        if (ver) {
+          return {
+            installed: true,
+            version: ver,
+            path: builtinPath,
+            source: 'builtin'
+          }
         }
       }
     }
@@ -151,11 +164,28 @@ export class FFmpegManager {
   }
 
   /**
+   * 根据当前系统与架构获取 ffmpeg-static 资源文件名
+   */
+  private getPlatformAsset(): string | null {
+    const p = process.platform
+    const a = process.arch
+    if (p === 'win32' && (a === 'x64' || a === 'ia32')) return 'ffmpeg-win32-x64.gz'
+    if (p === 'darwin' && a === 'arm64') return 'ffmpeg-darwin-arm64.gz'
+    if (p === 'darwin' && a === 'x64') return 'ffmpeg-darwin-x64.gz'
+    if (p === 'linux' && a === 'x64') return 'ffmpeg-linux-x64.gz'
+    if (p === 'linux' && a === 'arm64') return 'ffmpeg-linux-arm64.gz'
+    return null
+  }
+
+  /**
    * 在线一键按需下载并安装 FFmpeg 独立组件
    */
-  public async installFFmpeg(): Promise<FFmpegStatus> {
+  public async installFFmpeg(
+    onProgress?: (progress: FFmpegInstallProgress) => void
+  ): Promise<FFmpegStatus> {
     const current = await this.getStatus()
     if (current.installed) {
+      onProgress?.({ percent: 100, text: 'FFmpeg 组件已就绪' })
       return current
     }
 
@@ -164,7 +194,7 @@ export class FFmpegManager {
 
     console.log('[FFmpegManager] 准备安装 FFmpeg 独立组件至:', targetPath)
 
-    // 检测本地常见路径是否有候选文件
+    // 1. 检测本地常见路径是否有候选文件
     const candidateLocalPaths = [
       'C:\\ffmpeg\\bin\\ffmpeg.exe',
       'D:\\ffmpeg\\bin\\ffmpeg.exe',
@@ -173,51 +203,172 @@ export class FFmpegManager {
 
     for (const p of candidateLocalPaths) {
       if (existsSync(p)) {
+        onProgress?.({ percent: 100, text: '检测到本地候选组件，正在导入...' })
         return await this.importCustomBinary(p)
       }
     }
 
-    const downloadUrl =
-      process.platform === 'win32'
-        ? 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip'
-        : 'https://evermeet.cx/ffmpeg/getrelease/zip'
-
-    try {
-      console.log(`[FFmpegManager] 尝试从 ${downloadUrl} 下载 FFmpeg...`)
-      await this.downloadFile(downloadUrl, targetPath + '.zip')
-    } catch (err: any) {
-      console.warn('[FFmpegManager] 在线下载连接超时或受限:', err?.message)
+    // 2. 获取当前平台对应架构的归档文件名
+    const assetName = this.getPlatformAsset()
+    if (!assetName) {
       throw new Error(
-        '在线下载 FFmpeg 超时（网络/防火墙限制）。请点击「手动导入」直接选择本地现有的 ffmpeg.exe，或安装到系统环境变量后点击刷新。'
+        `当前平台架构 (${process.platform}-${process.arch}) 暂不支持自动在线下载，请通过「手动导入」选择本地 ffmpeg 可执行文件`
       )
     }
 
-    return await this.getStatus()
+    // 3. 配置双镜像源：首选阿里云 open-source npmmirror 国内 CDN，备选 GitHub 官方源
+    const mirrors = [
+      {
+        name: '国内高速镜像 (npmmirror)',
+        url: `https://registry.npmmirror.com/-/binary/ffmpeg-static/b6.1.1/${assetName}`
+      },
+      {
+        name: 'GitHub 官方源',
+        url: `https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/${assetName}`
+      }
+    ]
+
+    const tempPath = targetPath + '.download.tmp'
+    let lastError: any = null
+
+    for (const mirror of mirrors) {
+      try {
+        console.log(`[FFmpegManager] 尝试从 ${mirror.name} 下载: ${mirror.url}`)
+        onProgress?.({ percent: 0, text: `正在连接 ${mirror.name}...` })
+
+        await this.downloadAndExtractGz(mirror.url, tempPath, onProgress)
+
+        // 下载解压校验成功，替换目标文件
+        if (existsSync(targetPath)) {
+          try {
+            unlinkSync(targetPath)
+          } catch {}
+        }
+        renameSync(tempPath, targetPath)
+
+        if (process.platform !== 'win32') {
+          const fs = await import('fs')
+          fs.chmodSync(targetPath, 0o755)
+        }
+
+        onProgress?.({ percent: 99, text: '正在验证组件可用性...' })
+        const ver = await this.queryVersion(targetPath)
+        if (!ver) {
+          throw new Error('下载解压后的文件无法被识别为有效的 FFmpeg 可执行文件')
+        }
+
+        console.log(`[FFmpegManager] FFmpeg 组件安装成功: ${targetPath} (v${ver})`)
+        onProgress?.({ percent: 100, text: 'FFmpeg 组件安装就绪！' })
+
+        return {
+          installed: true,
+          version: ver,
+          path: targetPath,
+          source: 'builtin'
+        }
+      } catch (err: any) {
+        lastError = err
+        console.warn(`[FFmpegManager] 从 ${mirror.name} 安装失败:`, err?.message)
+        if (existsSync(tempPath)) {
+          try {
+            unlinkSync(tempPath)
+          } catch {}
+        }
+      }
+    }
+
+    throw new Error(
+      `在线下载 FFmpeg 失败 (${lastError?.message || '网络连接受限'})。建议：检查网络代理，或点击「手动导入」直接选择本地现有的 ffmpeg.exe。`
+    )
   }
 
-  private async downloadFile(fileUrl: string, destPath: string): Promise<void> {
+  /**
+   * 从网络流实时解压 .gz 归档并写入本地可执行文件
+   */
+  private async downloadAndExtractGz(
+    fileUrl: string,
+    destPath: string,
+    onProgress?: (progress: FFmpegInstallProgress) => void
+  ): Promise<void> {
     const resp = await net.fetch(fileUrl, {
       headers: { 'User-Agent': 'Doujiao-Host/0.2.0' },
-      signal: AbortSignal.timeout(60000)
+      signal: AbortSignal.timeout(180000)
     })
+
     if (!resp.ok) {
       throw new Error(`HTTP ${resp.status} ${resp.statusText}`)
     }
+
+    const totalBytes = Number(resp.headers.get('content-length') || 0)
     const reader = resp.body?.getReader()
     if (!reader) {
-      throw new Error('无法创建网络数据流')
+      throw new Error('无法建立网络数据流')
     }
-    const file = createWriteStream(destPath)
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      file.write(Buffer.from(value))
-    }
-    file.end()
-    await new Promise<void>((resolve, reject) => {
-      file.on('finish', () => resolve())
-      file.on('error', reject)
+
+    const gunzip = zlib.createGunzip()
+    const outStream = createWriteStream(destPath)
+
+    const streamPromise = new Promise<void>((resolve, reject) => {
+      gunzip.on('error', reject)
+      outStream.on('error', reject)
+      outStream.on('finish', resolve)
     })
+
+    gunzip.pipe(outStream)
+
+    let downloadedBytes = 0
+    let lastTime = Date.now()
+    let lastBytes = 0
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) {
+          gunzip.end()
+          break
+        }
+
+        downloadedBytes += value.length
+
+        const canWrite = gunzip.write(Buffer.from(value))
+        if (!canWrite) {
+          await once(gunzip, 'drain')
+        }
+
+        const now = Date.now()
+        if (now - lastTime >= 200) {
+          const deltaBytes = downloadedBytes - lastBytes
+          const deltaTime = (now - lastTime) / 1000
+          const speed = deltaBytes / (deltaTime || 1)
+          const speedStr =
+            speed > 1024 * 1024
+              ? `${(speed / (1024 * 1024)).toFixed(1)} MB/s`
+              : `${Math.round(speed / 1024)} KB/s`
+
+          lastTime = now
+          lastBytes = downloadedBytes
+
+          const percent =
+            totalBytes > 0
+              ? Math.min(98, Math.round((downloadedBytes / totalBytes) * 100))
+              : 0
+          const mbDownloaded = (downloadedBytes / 1024 / 1024).toFixed(1)
+          const mbTotal = totalBytes > 0 ? (totalBytes / 1024 / 1024).toFixed(1) : '28.2'
+
+          onProgress?.({
+            percent,
+            speed: speedStr,
+            text: `正在极速下载并解压 (${mbDownloaded}MB / ${mbTotal}MB, ${speedStr})`
+          })
+        }
+      }
+
+      await streamPromise
+    } catch (err) {
+      gunzip.destroy()
+      outStream.destroy()
+      throw err
+    }
   }
 
   /**
@@ -231,7 +382,7 @@ export class FFmpegManager {
   ): Promise<{ success: boolean; outputPath: string }> {
     const status = await this.getStatus()
     if (!status.installed || !status.path) {
-      throw new Error('未检测到 FFmpeg 独立组件，无法执行音视频流合成。请先在「宿主设置」中完成 FFmpeg 安装配置。')
+      throw new Error('未检测到 FFmpeg 独立组件，无法执行音视频流合成。请先在「应用设置」中完成 FFmpeg 安装配置。')
     }
 
     if (!existsSync(videoPath)) {

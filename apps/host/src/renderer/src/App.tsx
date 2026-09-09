@@ -80,6 +80,8 @@ export default function App(): JSX.Element {
   const [loadingMarket, setLoadingMarket] = useState(false)
   const [installingPluginId, setInstallingPluginId] = useState<string | null>(null)
   const [ffmpegLoading, setFFmpegLoading] = useState(false)
+  const [ffmpegProgress, setFFmpegProgress] = useState<{ percent: number; speed?: string; text?: string } | null>(null)
+  const [ffmpegCardMsg, setFFmpegCardMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
   const [permissionModal, setPermissionModal] = useState<PermissionDiffModalData | null>(null)
 
   // 网络代理配置状态 (默认跟随系统代理)
@@ -193,6 +195,16 @@ export default function App(): JSX.Element {
     checkFFmpeg()
     checkDouyinStatus()
     fetchProxyConfig()
+
+    let cleanupProgress: (() => void) | undefined
+    if (window.hostAPI?.onFFmpegInstallProgress) {
+      cleanupProgress = window.hostAPI.onFFmpegInstallProgress((p) => {
+        setFFmpegProgress(p)
+      })
+    }
+    return () => {
+      cleanupProgress?.()
+    }
   }, [])
 
   // 监听 Tab 切换挂载/隐藏沙箱插件
@@ -400,34 +412,46 @@ export default function App(): JSX.Element {
   const handleInstallFFmpeg = async () => {
     if (!window.hostAPI?.installFFmpeg) return
     setFFmpegLoading(true)
+    setFFmpegProgress({ percent: 5, text: '正在连接高速下载源...' })
+    setFFmpegCardMsg(null)
     try {
       const res = await window.hostAPI.installFFmpeg()
-      if (res.success) {
+      if (res.success && res.status?.installed) {
         setFFmpegStatus(res.status)
-        setInstallMsg({ text: 'FFmpeg 独立组件已就绪！', type: 'success' })
+        setFFmpegCardMsg({
+          text: `FFmpeg 组件已就绪！(${res.status.version ? 'v' + res.status.version : '最新版本'})`,
+          type: 'success'
+        })
       } else {
-        setInstallMsg({ text: res.error || 'FFmpeg 安装失败', type: 'error' })
+        setFFmpegCardMsg({ text: res.error || 'FFmpeg 安装未完成，请重试或手动导入', type: 'error' })
       }
     } catch (err: any) {
-      setInstallMsg({ text: err?.message || 'FFmpeg 操作异常', type: 'error' })
+      setFFmpegCardMsg({ text: err?.message || 'FFmpeg 安装异常', type: 'error' })
     } finally {
       setFFmpegLoading(false)
-      setTimeout(() => setInstallMsg(null), 5000)
+      setFFmpegProgress(null)
+      setTimeout(() => setFFmpegCardMsg(null), 8000)
     }
   }
 
   const handleSelectFFmpegFile = async () => {
     if (!window.hostAPI?.selectFFmpegFile) return
+    setFFmpegCardMsg(null)
     const res = await window.hostAPI.selectFFmpegFile()
     if (res.canceled) return
 
-    if (res.success) {
+    if (res.success && res.status?.installed) {
       setFFmpegStatus(res.status)
-      setInstallMsg({ text: '成功导入本地 FFmpeg 可执行文件！', type: 'success' })
+      setFFmpegCardMsg({ text: '成功导入本地 FFmpeg 可执行文件！', type: 'success' })
     } else {
-      setInstallMsg({ text: res.error || '导入失败', type: 'error' })
+      setFFmpegCardMsg({ text: res.error || '导入失败，请选择有效的 ffmpeg.exe', type: 'error' })
     }
-    setTimeout(() => setInstallMsg(null), 5000)
+    setTimeout(() => setFFmpegCardMsg(null), 6000)
+  }
+
+  const handleOpenFFmpegDir = async () => {
+    if (!window.hostAPI?.openFFmpegDir) return
+    await window.hostAPI.openFFmpegDir()
   }
 
   // 宿主触发抖音扫码登录
@@ -999,7 +1023,7 @@ export default function App(): JSX.Element {
 
                 {/* FFmpeg 独立组件配置 */}
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
                       <div className="text-sm font-medium text-white flex items-center gap-2">
                         <span>FFmpeg 多媒体独立扩展组件</span>
@@ -1023,7 +1047,16 @@ export default function App(): JSX.Element {
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {ffmpegStatus.installed && (
+                        <button
+                          onClick={handleOpenFFmpegDir}
+                          className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+                          title="在文件资源管理器中定位组件"
+                        >
+                          📂 打开目录
+                        </button>
+                      )}
                       <button
                         onClick={handleSelectFFmpegFile}
                         className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
@@ -1033,12 +1066,52 @@ export default function App(): JSX.Element {
                       <button
                         onClick={handleInstallFFmpeg}
                         disabled={ffmpegLoading}
-                        className="px-3.5 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-md shadow-emerald-600/20 transition-colors"
+                        className="px-3.5 py-1.5 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-md shadow-emerald-600/20 transition-colors disabled:opacity-50"
                       >
-                        {ffmpegLoading ? '检测安装中...' : ffmpegStatus.installed ? '重新检测' : '在线安装'}
+                        {ffmpegLoading ? '正在下载解压...' : ffmpegStatus.installed ? '重新检测' : '在线安装'}
                       </button>
                     </div>
                   </div>
+
+                  {/* 实时安装进度条 */}
+                  {ffmpegLoading && ffmpegProgress && (
+                    <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300 font-medium">
+                          {ffmpegProgress.text || '正在极速下载并解压组件...'}
+                        </span>
+                        <span className="text-emerald-400 font-mono font-semibold">
+                          {ffmpegProgress.percent}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-200 rounded-full"
+                          style={{ width: `${Math.max(6, ffmpegProgress.percent)}%` }}
+                        />
+                      </div>
+                      {ffmpegProgress.speed && (
+                        <div className="text-[11px] text-slate-500 flex justify-between">
+                          <span>实时传输速率</span>
+                          <span className="font-mono text-slate-400">{ffmpegProgress.speed}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 卡片就地消息提示 */}
+                  {ffmpegCardMsg && (
+                    <div
+                      className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-all ${
+                        ffmpegCardMsg.type === 'success'
+                          ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                          : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                      }`}
+                    >
+                      <span>{ffmpegCardMsg.text}</span>
+                      <button onClick={() => setFFmpegCardMsg(null)} className="text-slate-400 hover:text-white">✕</button>
+                    </div>
+                  )}
                 </div>
 
                 {/* 下载存储 */}

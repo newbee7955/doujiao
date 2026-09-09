@@ -1,4 +1,6 @@
-import { ipcMain, BrowserWindow, dialog } from 'electron'
+import { ipcMain, BrowserWindow, dialog, shell } from 'electron'
+import { existsSync } from 'fs'
+import { dirname } from 'path'
 import { PluginViewContainerManager } from '../container/plugin-view'
 import { DownloadTaskManager } from '../tasks/download-manager'
 import { PluginManager } from '../plugins/plugin-manager'
@@ -108,11 +110,18 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
     return await FFmpegManager.getInstance().getStatus()
   })
 
-  // 11. 独立多媒体组件：FFmpeg 一键安装/下载
+  // 11. 独立多媒体组件：FFmpeg 一键安装/下载 (支持进度广播与严格状态校验)
   ipcMain.handle('host:ffmpeg:install', async () => {
     try {
       const { FFmpegManager } = await import('../media/ffmpeg-manager')
-      const status = await FFmpegManager.getInstance().installFFmpeg()
+      const status = await FFmpegManager.getInstance().installFFmpeg((progress) => {
+        if (!mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('host:ffmpeg:install-progress', progress)
+        }
+      })
+      if (!status.installed) {
+        return { success: false, error: status.error || '安装未完成，未检测到有效可执行文件' }
+      }
       return { success: true, status }
     } catch (err: any) {
       return { success: false, error: err?.message || '安装失败' }
@@ -142,6 +151,23 @@ export function registerHostIpc(mainWindow: BrowserWindow): void {
       return { success: true, status }
     } catch (err: any) {
       return { success: false, error: err?.message || '导入失败' }
+    }
+  })
+
+  // 12.1 独立多媒体组件：在系统文件管理器中打开 FFmpeg 目录
+  ipcMain.handle('host:ffmpeg:open-dir', async () => {
+    try {
+      const { FFmpegManager } = await import('../media/ffmpeg-manager')
+      const status = await FFmpegManager.getInstance().getStatus()
+      if (status.path && existsSync(status.path)) {
+        shell.showItemInFolder(status.path)
+      } else {
+        const target = FFmpegManager.getInstance().getTargetExecutablePath()
+        shell.openPath(dirname(target))
+      }
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err?.message }
     }
   })
 

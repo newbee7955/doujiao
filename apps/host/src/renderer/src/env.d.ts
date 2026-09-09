@@ -15,6 +15,8 @@ export interface HostAPI {
   getFFmpegStatus: () => Promise<{ installed: boolean; version?: string; path?: string; source?: string; error?: string }>
   installFFmpeg: () => Promise<{ success: boolean; status?: any; error?: string }>
   selectFFmpegFile: () => Promise<{ success?: boolean; canceled?: boolean; status?: any; error?: string }>
+  openFFmpegDir: () => Promise<{ success: boolean; error?: string }>
+  onFFmpegInstallProgress?: (callback: (progress: { percent: number; speed?: string; text?: string }) => void) => () => void
 
   getDouyinStatus: () => Promise<{ loggedIn: boolean }>
   loginDouyin: () => Promise<{ success: boolean; message?: string }>

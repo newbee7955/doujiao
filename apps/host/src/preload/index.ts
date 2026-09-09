@@ -24,6 +24,14 @@ const hostAPI = {
   getFFmpegStatus: () => ipcRenderer.invoke('host:ffmpeg:status'),
   installFFmpeg: () => ipcRenderer.invoke('host:ffmpeg:install'),
   selectFFmpegFile: () => ipcRenderer.invoke('host:ffmpeg:select-file'),
+  openFFmpegDir: () => ipcRenderer.invoke('host:ffmpeg:open-dir'),
+  onFFmpegInstallProgress: (callback: (progress: any) => void) => {
+    const handler = (_: any, p: any) => callback(p)
+    ipcRenderer.on('host:ffmpeg:install-progress', handler)
+    return () => {
+      ipcRenderer.removeListener('host:ffmpeg:install-progress', handler)
+    }
+  },
 
   // 网络代理与 GitHub 连通性管理
   getProxyStatus: () => ipcRenderer.invoke('host:proxy:get-status'),
