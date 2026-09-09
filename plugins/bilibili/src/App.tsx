@@ -12,11 +12,17 @@ export default function App(): JSX.Element {
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [pushing, setPushing] = useState(false)
   const [recentTasks, setRecentTasks] = useState<any[]>([])
+  const [hasFFmpeg, setHasFFmpeg] = useState<boolean | null>(null)
 
-  // 监听宿主广播的下载进度
+  // 检测宿主 FFmpeg 状态并监听宿主广播的下载进度
   useEffect(() => {
     try {
       const sdk = getSDK()
+      // 检测宿主 FFmpeg 状态
+      sdk.media?.checkFFmpeg()
+        .then((res) => setHasFFmpeg(!!res?.installed))
+        .catch(() => setHasFFmpeg(false))
+
       const unsubscribe = sdk.download.onProgress((info) => {
         setRecentTasks((prev) => {
           const idx = prev.findIndex((t) => t.taskId === info.taskId)
@@ -29,7 +35,9 @@ export default function App(): JSX.Element {
         })
       })
       return () => unsubscribe()
-    } catch {}
+    } catch {
+      setHasFFmpeg(false)
+    }
   }, [])
 
   // 解析视频
@@ -100,11 +108,20 @@ export default function App(): JSX.Element {
     setMsg({ text: `正在提取 ${selectedPages.length} 个选集的流地址并提交宿主...`, type: 'info' })
 
     const sdk = getSDK()
+    let ffmpegAvailable = hasFFmpeg
+    try {
+      const checkRes = await sdk.media?.checkFFmpeg()
+      ffmpegAvailable = !!checkRes?.installed
+      setHasFFmpeg(ffmpegAvailable)
+    } catch {
+      ffmpegAvailable = false
+    }
+
     let successCount = 0
 
     for (const page of selectedPages) {
       try {
-        const stream = await getPlayStream(videoInfo.bvid, page.cid)
+        const stream = await getPlayStream(videoInfo.bvid, page.cid, 80, !!ffmpegAvailable)
         const cleanTitle = (
           selectedPages.length > 1
             ? `${videoInfo.title} - P${page.page} ${page.part}`
@@ -116,7 +133,9 @@ export default function App(): JSX.Element {
           audioUrl: stream.audioUrl,
           filename: `${cleanTitle}.mp4`,
           headers: {
-            Referer: 'https://www.bilibili.com/'
+            Referer: 'https://www.bilibili.com/',
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
           },
           extra: {
             title: cleanTitle,
@@ -182,6 +201,16 @@ export default function App(): JSX.Element {
         >
           <span>{msg.text}</span>
           <button onClick={() => setMsg(null)} className="text-slate-400 hover:text-white">✕</button>
+        </div>
+      )}
+
+      {/* FFmpeg 状态感知横幅 */}
+      {hasFFmpeg === false && (
+        <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span>💡</span>
+            <span>当前宿主未检测到 FFmpeg，已自动启用免混流单文件下载模式（480P/720P）；如需下载 1080P+/4K 高清，可前往宿主「设置」一键安装 FFmpeg。</span>
+          </div>
         </div>
       )}
 
@@ -322,27 +351,47 @@ export default function App(): JSX.Element {
 
           <div className="space-y-2">
             {recentTasks.map((t) => (
-              <div key={t.taskId} className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800/60 text-xs space-y-1">
+              <div
+                key={t.taskId}
+                className={`p-3 rounded-lg border text-xs space-y-1.5 transition-colors ${
+                  t.status === 'failed'
+                    ? 'bg-rose-950/20 border-rose-900/40'
+                    : 'bg-slate-900/80 border-slate-800/60'
+                }`}
+              >
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-200 truncate max-w-sm">{t.filename}</span>
-                  <span className="text-slate-400 font-mono text-[11px]">
-                    {t.status === 'completed'
-                      ? '已完成'
-                      : t.status === 'merging'
-                      ? 'FFmpeg 音视频合成中...'
-                      : `${t.speed || ''} (${t.progress}%)`}
+                  <span className="text-slate-200 truncate max-w-sm font-medium">{t.filename}</span>
+                  <span className="font-mono text-[11px]">
+                    {t.status === 'completed' ? (
+                      <span className="text-emerald-400 font-medium">✅ 已完成</span>
+                    ) : t.status === 'failed' ? (
+                      <span className="text-rose-400 font-medium">❌ 下载失败</span>
+                    ) : t.status === 'merging' ? (
+                      <span className="text-amber-400 animate-pulse font-medium">⚙️ FFmpeg 音视频合成中...</span>
+                    ) : (
+                      <span className="text-slate-400">{t.speed || ''} ({t.progress}%)</span>
+                    )}
                   </span>
                 </div>
-                <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+
+                {t.status === 'failed' && t.error && (
+                  <div className="text-rose-400 text-[11px] bg-rose-500/10 px-2.5 py-1 rounded border border-rose-500/20 break-all">
+                    {t.error}
+                  </div>
+                )}
+
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ${
                       t.status === 'completed'
                         ? 'bg-emerald-500'
+                        : t.status === 'failed'
+                        ? 'bg-rose-500'
                         : t.status === 'merging'
                         ? 'bg-amber-400 animate-pulse'
                         : 'bg-pink-500'
                     }`}
-                    style={{ width: `${t.progress}%` }}
+                    style={{ width: `${t.status === 'failed' ? 100 : t.progress}%` }}
                   />
                 </div>
               </div>

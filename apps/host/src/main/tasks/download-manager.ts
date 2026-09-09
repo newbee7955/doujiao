@@ -259,7 +259,8 @@ export class DownloadTaskManager {
         },
         (res) => {
           if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            return this.streamToFile(res.headers.location, destPath, customHeaders, abortSignal, onProgress)
+            const redirectUrl = new URL(res.headers.location, url).href
+            return this.streamToFile(redirectUrl, destPath, customHeaders, abortSignal, onProgress)
               .then(resolve)
               .catch(reject)
           }

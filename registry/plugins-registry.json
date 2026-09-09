@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 5,
-  "updatedAt": "2026-09-09T08:26:13.473Z",
+  "registryVersion": 6,
+  "updatedAt": "2026-09-09T09:43:37.507Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -63,7 +63,7 @@
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T08:26:13.473Z",
+          "publishedAt": "2026-09-09T09:43:37.507Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -101,9 +101,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://github.com/newbee7955/doujiao/releases/download/bilibili-downloader-v1.0.0/bilibili-downloader-v1.0.0.zip",
-              "size": 55097,
-              "sha256": "949937618035712ccf99a665a4f17997681f29fcd95c065f3ed511cebbc709bd",
-              "signature": "t7KldEsWA1gfoAF71sJ5g0v/ZRdrlKU7KtMy2LSn6rYG0fErqazCzomQ/UygfxJviSGQuyqC+XkZJejTogMcDA=="
+              "size": 55634,
+              "sha256": "9daefb495f2646357526dc714318ec7e5d3a8f53d4ccb93588809a3f98a9386c",
+              "signature": "b7acTXQIqKC/kkOl6stYf+w4XvTV0JX6nnJPuvXkFBxtGtKvn5XcHrqZeu84BgnXYwQM4UeortkXp0pmUHi3DQ=="
             }
           ]
         }

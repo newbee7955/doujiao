@@ -79,11 +79,17 @@ export async function getVideoDetail(bvid: string): Promise<BiliVideoInfo> {
 
 /**
  * 获取指定分 P 的无损音视频流播放地址
- * 优先提取 DASH 格式中的独立音频流与最高码率视频流
+ * 支持 DASH 格式（需 FFmpeg）与 DURL 单流 MP4 格式（免混流）
  */
-export async function getPlayStream(bvid: string, cid: number, qn = 80): Promise<BiliStreamResult> {
+export async function getPlayStream(
+  bvid: string,
+  cid: number,
+  qn = 80,
+  preferDash = true
+): Promise<BiliStreamResult> {
   const sdk = getSDK()
-  const apiUrl = `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&qn=${qn}&fnval=16&fourk=1`
+  const fnval = preferDash ? '16&fourk=1' : '0'
+  const apiUrl = `https://api.bilibili.com/x/player/playurl?bvid=${bvid}&cid=${cid}&qn=${qn}&fnval=${fnval}`
 
   const res = await sdk.network.request<any>({
     url: apiUrl,
@@ -97,8 +103,8 @@ export async function getPlayStream(bvid: string, cid: number, qn = 80): Promise
 
   const data = res.data.data
 
-  // 1. DASH 现代音视频分离流格式 (DASH)
-  if (data.dash) {
+  // 1. 若优先 DASH 且平台返回了 dash 音视频分离流
+  if (preferDash && data.dash) {
     const video = data.dash.video?.[0]
     const audio = data.dash.audio?.[0]
 
@@ -114,13 +120,18 @@ export async function getPlayStream(bvid: string, cid: number, qn = 80): Promise
     }
   }
 
-  // 2. DURL 传统单流格式
+  // 2. DURL 传统单流 MP4 格式（音视频内置合一，免任何 FFmpeg 混流依赖）
   if (data.durl && data.durl.length > 0) {
     const stream = data.durl[0]
     return {
       quality: data.quality,
       videoUrl: stream.url
     }
+  }
+
+  // 3. 若 DASH 请求未获得可用地址，回退尝试一次传统单流
+  if (preferDash) {
+    return await getPlayStream(bvid, cid, qn, false)
   }
 
   throw new Error('未获取到可用的视频流地址')
