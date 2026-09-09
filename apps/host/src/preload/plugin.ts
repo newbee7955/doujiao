@@ -9,9 +9,15 @@ import type {
 
 let registeredLifecycle: PluginLifecycle | null = null
 
+// 从沙箱自定义协议 URL (如 doujiao-plugin://<plugin-id>/index.html) 动态解析宿主分配的真实 pluginId
+const currentPluginId =
+  typeof window !== 'undefined' && window.location?.hostname
+    ? window.location.hostname
+    : 'plugin-sandbox'
+
 const sdk: DoujiaoSDK = {
   version: '2.0.0',
-  pluginId: 'douyin-downloader', // 宿主真实校验依据来自底层 WebContents，而非此字段
+  pluginId: currentPluginId,
 
   network: {
     request: <T = any>(options: NetworkRequestOptions) => {
@@ -75,7 +81,7 @@ const sdk: DoujiaoSDK = {
     register: (hooks: PluginLifecycle) => {
       registeredLifecycle = hooks
       if (hooks.activate) {
-        hooks.activate({ pluginId: 'douyin-downloader', version: '1.2.0' })
+        hooks.activate({ pluginId: currentPluginId, version: '2.0.0' })
       }
     }
   }

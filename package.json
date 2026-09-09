@@ -13,6 +13,7 @@
     "build:sdk": "npm run build -w packages/plugin-sdk --if-present",
     "build:plugins": "npm run build -w plugins/douyin && npm run build -w plugins/bilibili",
     "build:host": "npm run build -w apps/host",
+    "create-plugin": "node scripts/create-plugin.cjs",
     "typecheck": "npm run typecheck --workspaces --if-present"
   }
 }

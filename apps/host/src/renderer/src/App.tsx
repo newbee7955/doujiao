@@ -66,6 +66,13 @@ export default function App(): JSX.Element {
     if (window.hostAPI?.listPlugins) {
       const list = await window.hostAPI.listPlugins()
       setPlugins(list || [])
+      if (list && list.length > 0) {
+        setActiveTab((prev) => {
+          if (prev === 'market' || prev === 'settings') return prev
+          const exists = list.some((p: any) => p.id === prev)
+          return exists ? prev : list[0].id
+        })
+      }
     }
   }
 
