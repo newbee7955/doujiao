@@ -8,9 +8,6 @@ directories:
 files:
   - out/**/*
   - package.json
-extraResources:
-  - from: '../../registry'
-    to: 'registry'
 win:
   target:
     - target: nsis
