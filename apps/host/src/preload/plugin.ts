@@ -92,6 +92,46 @@ const sdk: DoujiaoSDK = {
     }
   },
 
+  samba: {
+    getProfiles: () => ipcRenderer.invoke('plugin:samba:get-profiles'),
+    saveProfile: (profile: any) => ipcRenderer.invoke('plugin:samba:save-profile', profile),
+    deleteProfile: (id: string) => ipcRenderer.invoke('plugin:samba:delete-profile', id),
+    testConnection: (config: any) => ipcRenderer.invoke('plugin:samba:test-connection', config),
+    connect: (profileId: string) => ipcRenderer.invoke('plugin:samba:connect', profileId),
+    disconnect: (profileId: string) => ipcRenderer.invoke('plugin:samba:disconnect', profileId),
+    listDirectory: (profileId: string, path: string) =>
+      ipcRenderer.invoke('plugin:samba:list-directory', profileId, path),
+    createDirectory: (profileId: string, path: string) =>
+      ipcRenderer.invoke('plugin:samba:create-directory', profileId, path),
+    deleteItem: (profileId: string, path: string, isDirectory: boolean) =>
+      ipcRenderer.invoke('plugin:samba:delete-item', profileId, path, isDirectory),
+    renameItem: (profileId: string, oldPath: string, newPath: string) =>
+      ipcRenderer.invoke('plugin:samba:rename-item', profileId, oldPath, newPath),
+    readFileText: (profileId: string, path: string, maxBytes?: number) =>
+      ipcRenderer.invoke('plugin:samba:read-file-text', profileId, path, maxBytes),
+    getThumbnail: (profileId: string, path: string, mimeType: string, size: number) =>
+      ipcRenderer.invoke('plugin:samba:get-thumbnail', profileId, path, mimeType, size),
+    uploadFile: (profileId: string, localFilePath: string, remoteDirectory: string) =>
+      ipcRenderer.invoke('plugin:samba:upload-file', profileId, localFilePath, remoteDirectory),
+    downloadFile: (profileId: string, remoteFilePath: string, localSavePath?: string) =>
+      ipcRenderer.invoke('plugin:samba:download-file', profileId, remoteFilePath, localSavePath),
+    selectLocalFile: () => ipcRenderer.invoke('plugin:samba:select-local-file'),
+    selectLocalDirectory: () => ipcRenderer.invoke('plugin:samba:select-local-directory'),
+    onTransferProgress: (callback: (progress: any) => void) => {
+      const handler = (_: any, progress: any) => {
+        try {
+          callback(progress)
+        } catch (err) {
+          console.error('[DoujiaoSDK] Samba 传输进度回调异常:', err)
+        }
+      }
+      ipcRenderer.on('plugin:samba:transfer-progress', handler)
+      return () => {
+        ipcRenderer.removeListener('plugin:samba:transfer-progress', handler)
+      }
+    }
+  },
+
   ui: {
     notify: (options) => {
       console.log(`[PluginToast] [${options.type || 'info'}] ${options.message}`)

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 15,
-  "updatedAt": "2026-09-09T11:02:51.142Z",
+  "registryVersion": 16,
+  "updatedAt": "2026-09-09T11:18:42.342Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -282,6 +282,43 @@
               "size": 54522,
               "sha256": "f288e167b35d5294aea99c326e99aa6b2c7fbaac6f8ff5e24bb0b3433e80a73e",
               "signature": "CtjhU0bC4JnxtXu/R04hQxAUH6pawGssYYkN3z76l1iUCj3NVdffpzbelmYFjmifdX+toI+f3ooZtD4rOsbHBw=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samba-manager",
+      "publisher": "doujiao-official",
+      "name": "Samba 文件管理",
+      "description": "专业 NAS/Samba 文件浏览器：支持自定义端口与用户配置、流式上传下载、文件浏览与目录创建、文本预览以及图片视频智能缩略图",
+      "icon": "🗄️",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T11:18:42.342Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "samba.client"
+            },
+            {
+              "capability": "media.merge"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/samba-manager-v1.0.0/samba-manager-v1.0.0.zip",
+              "size": 60162,
+              "sha256": "f9318cb8b6c6379e4440b253b4ebb8dd3173402d6aafa0b38e31b31f0f213da3",
+              "signature": "wH48pyF30OpinLVpyVBQX7YT0mPMszOjUpk5vu847Zyu4nhBSgULMMpa+1OSxqEnXwuhjseXoN0EeuX14ASQAQ=="
             }
           ]
         }

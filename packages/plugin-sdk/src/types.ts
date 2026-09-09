@@ -9,6 +9,7 @@ export type CapabilityType =
   | 'browser.extract'
   | 'media.merge'
   | 'clipboard.history'
+  | 'samba.client'
   | 'ui.dialog';
 
 export interface NetworkCapability {
@@ -35,13 +36,59 @@ export interface ClipboardCapability {
   capability: 'clipboard.history';
 }
 
+export interface SambaCapability {
+  capability: 'samba.client';
+}
+
 export type PluginCapability =
   | NetworkCapability
   | DownloadCapability
   | BrowserLoginCapability
   | MediaMergeCapability
   | ClipboardCapability
+  | SambaCapability
   | { capability: CapabilityType; [key: string]: any };
+
+export interface SambaConfig {
+  host: string;
+  port?: number;
+  share: string;
+  basePath?: string;
+  username?: string;
+  password?: string;
+  domain?: string;
+  workgroup?: string;
+}
+
+export interface SambaProfile {
+  id: string;
+  name: string;
+  config: SambaConfig;
+  createdAt: number;
+  lastConnected?: number;
+}
+
+export interface SambaFileItem {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size: number;
+  mtime: number;
+  birthtime?: number;
+  extension: string;
+}
+
+export interface SambaTransferProgress {
+  id: string;
+  type: 'upload' | 'download';
+  fileName: string;
+  transferredBytes: number;
+  totalBytes: number;
+  progress: number;
+  speed: string;
+  status: 'transferring' | 'completed' | 'failed' | 'cancelled';
+  error?: string;
+}
 
 export interface PluginEngines {
   doujiao: string;    // e.g. ">=0.2.0 <0.3.0"
@@ -167,6 +214,27 @@ export interface DoujiaoSDK {
   media?: {
     merge(options: { videoPath: string; audioPath: string; outputPath: string }): Promise<{ success: boolean; error?: string }>;
     checkFFmpeg(): Promise<{ installed: boolean; version?: string; path?: string }>;
+  };
+
+  /** Samba 文件系统管理能力 */
+  samba?: {
+    getProfiles(): Promise<SambaProfile[]>;
+    saveProfile(profile: SambaProfile): Promise<boolean>;
+    deleteProfile(id: string): Promise<boolean>;
+    testConnection(config: SambaConfig): Promise<{ success: boolean; error?: string }>;
+    connect(profileId: string): Promise<{ success: boolean; error?: string }>;
+    disconnect(profileId: string): Promise<boolean>;
+    listDirectory(profileId: string, path: string): Promise<SambaFileItem[]>;
+    createDirectory(profileId: string, path: string): Promise<boolean>;
+    deleteItem(profileId: string, path: string, isDirectory: boolean): Promise<boolean>;
+    renameItem(profileId: string, oldPath: string, newPath: string): Promise<boolean>;
+    readFileText(profileId: string, path: string, maxBytes?: number): Promise<string>;
+    getThumbnail(profileId: string, path: string, mimeType: string, size: number): Promise<string | null>;
+    uploadFile(profileId: string, localFilePath: string, remoteDirectory: string): Promise<{ success: boolean; error?: string }>;
+    downloadFile(profileId: string, remoteFilePath: string, localSavePath?: string): Promise<{ success: boolean; localPath?: string; error?: string }>;
+    selectLocalFile(): Promise<{ canceled: boolean; filePath?: string; fileName?: string; size?: number }>;
+    selectLocalDirectory(): Promise<{ canceled: boolean; directoryPath?: string }>;
+    onTransferProgress(callback: (progress: SambaTransferProgress) => void): () => void;
   };
 
   /** UI 交互与通知 */

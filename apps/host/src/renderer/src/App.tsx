@@ -63,6 +63,7 @@ function getPluginEmoji(plugin: { id?: string; icon?: string }): string {
   if (id.includes('notepad')) return '🗒️'
   if (id.includes('clipboard')) return '📋'
   if (id.includes('browser')) return '🌐'
+  if (id.includes('samba')) return '🗄️'
   return '🧩'
 }
 

@@ -8,6 +8,7 @@ import {
   openDouyinLoginWindow
 } from '../auth/douyin-auth'
 import { ClipboardHistoryService } from '../services/clipboard-service'
+import { SambaService } from '../services/samba-service'
 import type { NetworkRequestOptions, DownloadTaskRequest } from '@doujiao/plugin-sdk'
 
 /**
@@ -217,6 +218,113 @@ export function registerPluginIpcBridge(): void {
     for (const [, instance] of (containerManager as any).views.entries()) {
       if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
         instance.view.webContents.send('plugin:clipboard:changed', items)
+      }
+    }
+  })
+
+  // ==========================================
+  // 8. Samba 文件系统管理能力 (需要 samba.client 权限)
+  // ==========================================
+  const sambaService = SambaService.getInstance()
+
+  const checkSambaPermission = async (senderId: number): Promise<string> => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(senderId)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    const { PluginManager } = await import('../plugins/plugin-manager')
+    const plugin = PluginManager.getInstance().getPlugin(pluginId)
+    const hasPermission = plugin?.manifest?.permissions?.some(
+      (p: any) => p.capability === 'samba.client'
+    )
+    if (!hasPermission) {
+      throw new Error(`[Security] 插件 ${pluginId} 未在 manifest.json 中声明 samba.client 权限，拒绝调用`)
+    }
+    return pluginId
+  }
+
+  ipcMain.handle('plugin:samba:get-profiles', async (event) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.getProfiles()
+  })
+
+  ipcMain.handle('plugin:samba:save-profile', async (event, profile: any) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.saveProfile(profile)
+  })
+
+  ipcMain.handle('plugin:samba:delete-profile', async (event, id: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.deleteProfile(id)
+  })
+
+  ipcMain.handle('plugin:samba:test-connection', async (event, config: any) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.testConnection(config)
+  })
+
+  ipcMain.handle('plugin:samba:connect', async (event, profileId: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.connect(profileId)
+  })
+
+  ipcMain.handle('plugin:samba:disconnect', async (event, profileId: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.disconnect(profileId)
+  })
+
+  ipcMain.handle('plugin:samba:list-directory', async (event, profileId: string, path: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.listDirectory(profileId, path)
+  })
+
+  ipcMain.handle('plugin:samba:create-directory', async (event, profileId: string, path: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.createDirectory(profileId, path)
+  })
+
+  ipcMain.handle('plugin:samba:delete-item', async (event, profileId: string, path: string, isDirectory: boolean) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.deleteItem(profileId, path, isDirectory)
+  })
+
+  ipcMain.handle('plugin:samba:rename-item', async (event, profileId: string, oldPath: string, newPath: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.renameItem(profileId, oldPath, newPath)
+  })
+
+  ipcMain.handle('plugin:samba:read-file-text', async (event, profileId: string, path: string, maxBytes?: number) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.readFileText(profileId, path, maxBytes)
+  })
+
+  ipcMain.handle('plugin:samba:get-thumbnail', async (event, profileId: string, path: string, mimeType: string, size: number) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.getThumbnail(profileId, path, mimeType, size)
+  })
+
+  ipcMain.handle('plugin:samba:upload-file', async (event, profileId: string, localFilePath: string, remoteDirectory: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.uploadFile(profileId, localFilePath, remoteDirectory)
+  })
+
+  ipcMain.handle('plugin:samba:download-file', async (event, profileId: string, remoteFilePath: string, localSavePath?: string) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.downloadFile(profileId, remoteFilePath, localSavePath)
+  })
+
+  ipcMain.handle('plugin:samba:select-local-file', async (event) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.selectLocalFile()
+  })
+
+  ipcMain.handle('plugin:samba:select-local-directory', async (event) => {
+    await checkSambaPermission(event.sender.id)
+    return sambaService.selectLocalDirectory()
+  })
+
+  sambaService.onProgress((progress) => {
+    for (const [, instance] of (containerManager as any).views.entries()) {
+      if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
+        instance.view.webContents.send('plugin:samba:transfer-progress', progress)
       }
     }
   })
