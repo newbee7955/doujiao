@@ -33,6 +33,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     backgroundColor: '#0f172a',
+    icon: join(__dirname, '../../build/icon.png'),
     webPreferences: {
       sandbox: true,               // 加固：开启沙箱
       contextIsolation: true,      // 加固：上下文隔离

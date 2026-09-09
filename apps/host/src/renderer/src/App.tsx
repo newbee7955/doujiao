@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import appIcon from './assets/app-icon.png'
 
 interface PluginInfo {
   id: string
@@ -451,8 +452,8 @@ export default function App(): JSX.Element {
         className="h-12 border-b border-slate-800 flex items-center justify-between px-4 bg-slate-900/80 backdrop-blur z-20"
         style={{ WebkitAppRegion: 'drag' } as any}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🫛</span>
+        <div className="flex items-center gap-2.5">
+          <img src={appIcon} alt="Logo" className="w-6 h-6 rounded-md shadow-sm object-contain flex-shrink-0" />
           <span className="font-bold text-sm tracking-wide bg-gradient-to-r from-emerald-400 to-teal-200 bg-clip-text text-transparent">
             豆角工具箱 Doujiao
           </span>
