@@ -91,19 +91,20 @@ export class PluginManager {
    * 遵循开发环境优先与生产不可变指针机制，准确根据 manifest.id 匹配
    */
   public getActiveVersionDir(pluginId: string): string | null {
-    // 1. 优先从已发现插件列表中准确匹配 manifest.id
+    // 1. 优先从已安装插件列表中准确匹配 manifest.id
     const allPlugins = this.listAllPlugins()
     const match = allPlugins.find((p) => p.id === pluginId)
     if (match && match.activeVersionPath && existsSync(match.activeVersionPath)) {
       return match.activeVersionPath
     }
 
-    // 2. 生产环境兜底: userData/plugins/<pluginId>/versions/<activeVersion>
+    // 2. 检查 userData/plugins/<pluginId>/versions/<activeVersion>
     const state = this.getPluginState(pluginId)
     if (state && state.enabled && state.activeVersion) {
       const versionDir = join(this.userDataPluginsDir, pluginId, 'versions', state.activeVersion)
       if (existsSync(versionDir)) {
-        return versionDir
+        const distDir = join(versionDir, 'dist')
+        return existsSync(distDir) ? distDir : versionDir
       }
     }
 
@@ -281,47 +282,49 @@ export class PluginManager {
   }
 
   /**
-   * 获取所有可用与已安装的插件清单（整合开发目录与 userData 生产目录）
+   * 获取所有已安装的插件清单（默认纯净微内核模式，不默认预装任何插件，由用户手动从市场或本地安装）
    */
   public listAllPlugins(): DiscoveredPlugin[] {
     const result: Map<string, DiscoveredPlugin> = new Map()
 
-    // 1. 扫描开发目录 plugins/*
-    try {
-      const devPluginsRoot = this.getDevPluginsRoot()
-      if (existsSync(devPluginsRoot)) {
-        const dirs = readdirSync(devPluginsRoot, { withFileTypes: true })
-        for (const dirent of dirs) {
-          if (!dirent.isDirectory()) continue
-          const manifestFile = join(devPluginsRoot, dirent.name, 'manifest.json')
-          if (existsSync(manifestFile)) {
-            try {
-              const manifest: PluginManifest = JSON.parse(readFileSync(manifestFile, 'utf-8'))
-              const distDir = join(devPluginsRoot, dirent.name, 'dist')
-              result.set(manifest.id, {
-                id: manifest.id,
-                name: manifest.name,
-                version: manifest.version,
-                description: manifest.description,
-                icon: manifest.icon,
-                publisher: manifest.publisher,
-                isDev: true,
-                isInstalled: true,
-                enabled: true,
-                activeVersionPath: existsSync(distDir) ? distDir : join(devPluginsRoot, dirent.name),
-                manifest
-              })
-            } catch (err) {
-              console.warn(`[PluginManager] 解析开发插件清单失败 (${dirent.name}):`, err)
+    // 1. 仅在显式声明环境变量 DOUJIAO_DEV_PLUGINS=true 时自动探测源码 plugins/* 目录
+    if (process.env.DOUJIAO_DEV_PLUGINS === 'true') {
+      try {
+        const devPluginsRoot = this.getDevPluginsRoot()
+        if (existsSync(devPluginsRoot)) {
+          const dirs = readdirSync(devPluginsRoot, { withFileTypes: true })
+          for (const dirent of dirs) {
+            if (!dirent.isDirectory()) continue
+            const manifestFile = join(devPluginsRoot, dirent.name, 'manifest.json')
+            if (existsSync(manifestFile)) {
+              try {
+                const manifest: PluginManifest = JSON.parse(readFileSync(manifestFile, 'utf-8'))
+                const distDir = join(devPluginsRoot, dirent.name, 'dist')
+                result.set(manifest.id, {
+                  id: manifest.id,
+                  name: manifest.name,
+                  version: manifest.version,
+                  description: manifest.description,
+                  icon: manifest.icon,
+                  publisher: manifest.publisher,
+                  isDev: true,
+                  isInstalled: true,
+                  enabled: true,
+                  activeVersionPath: existsSync(distDir) ? distDir : join(devPluginsRoot, dirent.name),
+                  manifest
+                })
+              } catch (err) {
+                console.warn(`[PluginManager] 解析开发插件清单失败 (${dirent.name}):`, err)
+              }
             }
           }
         }
+      } catch (err) {
+        console.warn(`[PluginManager] 扫描开发插件目录失败:`, err)
       }
-    } catch (err) {
-      console.warn(`[PluginManager] 扫描开发插件目录失败:`, err)
     }
 
-    // 2. 扫描生产环境 userData/plugins/*
+    // 2. 扫描用户实际安装的 userData/plugins/* 目录
     try {
       if (existsSync(this.userDataPluginsDir)) {
         const dirs = readdirSync(this.userDataPluginsDir, { withFileTypes: true })
@@ -337,7 +340,9 @@ export class PluginManager {
           if (existsSync(manifestFile)) {
             try {
               const manifest: PluginManifest = JSON.parse(readFileSync(manifestFile, 'utf-8'))
-              // 若开发目录未占用此插件，则添加生产版本
+              const distDir = join(versionDir, 'dist')
+              const activeVersionPath = existsSync(distDir) ? distDir : versionDir
+
               if (!result.has(manifest.id)) {
                 result.set(manifest.id, {
                   id: manifest.id,
@@ -349,7 +354,7 @@ export class PluginManager {
                   isDev: false,
                   isInstalled: true,
                   enabled: state.enabled,
-                  activeVersionPath: versionDir,
+                  activeVersionPath,
                   manifest
                 })
               }
@@ -360,7 +365,7 @@ export class PluginManager {
         }
       }
     } catch (err) {
-      console.warn(`[PluginManager] 扫描生产插件目录失败:`, err)
+      console.warn(`[PluginManager] 扫描已安装插件目录失败:`, err)
     }
 
     return Array.from(result.values())
