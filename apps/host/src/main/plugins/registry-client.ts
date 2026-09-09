@@ -277,32 +277,58 @@ export class RegistryClient {
     }
 
     if (!downloaded) {
-      console.log(`[RegistryClient] 直连 GitHub 下载插件发布包: ${artifact.url}`)
-      let resp: any = null
-      try {
-        resp = await net.fetch(artifact.url, { signal: AbortSignal.timeout(60000) })
-      } catch (err: any) {
-        throw new Error(`连接 GitHub 下载失败 (${err?.message})。请检查系统代理设置是否开启。`)
+      const candidateUrls = Array.from(
+        new Set([
+          artifact.url,
+          `https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/${zipFileName}`,
+          `https://github.com/newbee7955/doujiao/raw/main/registry/releases/${zipFileName}`
+        ])
+      )
+
+      let lastError = ''
+      let fetchSuccess = false
+
+      for (const downloadUrl of candidateUrls) {
+        console.log(`[RegistryClient] 直连 GitHub 尝试下载插件包: ${downloadUrl}`)
+        try {
+          const resp = await net.fetch(downloadUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Doujiao-Host/0.2.0'
+            },
+            signal: AbortSignal.timeout(60000)
+          })
+
+          if (resp && resp.ok) {
+            const fileStream = createWriteStream(targetZipPath)
+            const reader = resp.body?.getReader()
+            if (!reader) {
+              throw new Error('无法创建网络数据流')
+            }
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              fileStream.write(Buffer.from(value))
+            }
+            fileStream.end()
+
+            await new Promise<void>((resolve) => fileStream.on('finish', () => resolve()))
+            fetchSuccess = true
+            console.log(`[RegistryClient] 插件包下载完成 (${downloadUrl})`)
+            break
+          } else {
+            lastError = `HTTP ${resp?.status || '连接超时'}`
+            console.warn(`[RegistryClient] 下载源返回状态异常: ${downloadUrl} (${lastError})`)
+          }
+        } catch (err: any) {
+          lastError = err?.message || '网络连接异常'
+          console.warn(`[RegistryClient] 下载连接失败: ${downloadUrl} (${lastError})`)
+        }
       }
 
-      if (!resp || !resp.ok) {
-        throw new Error(`下载插件包失败: HTTP ${resp?.status || '连接超时'}`)
+      if (!fetchSuccess) {
+        throw new Error(`下载插件安装包失败: ${lastError}。请检查系统代理设置或网络是否畅通。`)
       }
-
-      const fileStream = createWriteStream(targetZipPath)
-      const reader = resp.body?.getReader()
-      if (!reader) {
-        throw new Error('无法创建网络数据流')
-      }
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        fileStream.write(Buffer.from(value))
-      }
-      fileStream.end()
-
-      await new Promise<void>((resolve) => fileStream.on('finish', () => resolve()))
     }
 
     console.log(`[RegistryClient] 插件包下载完毕，开始双重密码学生命线安全校验...`)

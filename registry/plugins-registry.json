@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 19,
-  "updatedAt": "2026-09-09T14:39:52.327Z",
+  "registryVersion": 20,
+  "updatedAt": "2026-09-09T14:56:37.274Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -44,7 +44,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/douyin-downloader-v1.2.0/douyin-downloader-v1.2.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/douyin-downloader-v1.2.0.zip",
               "size": 59218,
               "sha256": "63ec9b0033c69963f4b8e36d964e308f8d70ced3fafef6c3eb860842bdbd376d",
               "signature": "WUofFTdUDluXOeTPhWtkFwviLj59o2MdII8yyN4WG3I0A95D853Kg912v/LGce6RzvTo2LOHOgPnnGpdfXNPBw=="
@@ -100,7 +100,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/bilibili-downloader-v1.0.1/bilibili-downloader-v1.0.1.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/bilibili-downloader-v1.0.1.zip",
               "size": 55637,
               "sha256": "8428718bc04345e8de9df1b45e06077ec2eb2bcff77ce9b54d7888ca37a049e1",
               "signature": "Uw8zptX952sd0ovnDqwG9Cat2kuENZ/UzWwfhnOtWAEDROOGIJbgSP2mVTzBXVKxjUKYbl5JmSO11NvC7xKbBA=="
@@ -147,7 +147,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/bilibili-downloader-v1.0.0/bilibili-downloader-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/bilibili-downloader-v1.0.0.zip",
               "size": 55634,
               "sha256": "9daefb495f2646357526dc714318ec7e5d3a8f53d4ccb93588809a3f98a9386c",
               "signature": "b7acTXQIqKC/kkOl6stYf+w4XvTV0JX6nnJPuvXkFBxtGtKvn5XcHrqZeu84BgnXYwQM4UeortkXp0pmUHi3DQ=="
@@ -177,7 +177,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/markdown-editor-v1.0.0/markdown-editor-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/markdown-editor-v1.0.0.zip",
               "size": 57264,
               "sha256": "5b013ed7ae75e2da827ec982f3598f42f1feb5f318b9de61b2cbdee56fef08f1",
               "signature": "MXStyRFzdi0nNt+Nk2EHJKxOuOCcFvufzEOH+QKA7U6P4VZIO5tLJzzFdK6/3V9VL0yYsBIq10oQjZXzliPDAA=="
@@ -207,7 +207,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/notepad-v1.0.0/notepad-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/notepad-v1.0.0.zip",
               "size": 54414,
               "sha256": "f2532e8e671945b8ee67eead48b58fb47a17a38afa158019461bbb9a50be51c9",
               "signature": "a6WxI6WSURkNCkTVmxpIOllKtpVLHdikNUWk88vnDoBoB1MwRGN7SwqYBqW18lsHn/CQi6L4J66Mfo+u5GOmCQ=="
@@ -241,7 +241,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/clipboard-history-v1.0.0/clipboard-history-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/clipboard-history-v1.0.0.zip",
               "size": 54084,
               "sha256": "e1fc3209dc89e54c00765b39758b1689d88256cbb3aa6d5f490fedb4aadc9565",
               "signature": "/W7C7p+7lcXYQtlqB9d/QBFJ0Bdvk095+63xbkZNS02W7q4QMxQjNK0wnplOjLucxd0HeSWeVhzYzmxKruX6Dw=="
@@ -278,7 +278,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/browser-v1.0.0/browser-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/browser-v1.0.0.zip",
               "size": 54522,
               "sha256": "f288e167b35d5294aea99c326e99aa6b2c7fbaac6f8ff5e24bb0b3433e80a73e",
               "signature": "CtjhU0bC4JnxtXu/R04hQxAUH6pawGssYYkN3z76l1iUCj3NVdffpzbelmYFjmifdX+toI+f3ooZtD4rOsbHBw=="
@@ -315,7 +315,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/samba-manager-v1.0.0/samba-manager-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/samba-manager-v1.0.0.zip",
               "size": 60612,
               "sha256": "ba3a2ebbb94be6ea65f0d507468e96af75211ca320097df56b8dcc5b96393446",
               "signature": "ZslGqMxyB7YzHWOAUmQWOyFdfnGOVNHsT2Ht+SZUyHK9Ed8H+tqfCQlNWJgnp0EPH30hQ301uPFbQ70cWD1aBQ=="
@@ -349,7 +349,7 @@
             {
               "platform": "any",
               "arch": "any",
-              "url": "https://github.com/newbee7955/doujiao/releases/download/lan-transfer-v1.0.0/lan-transfer-v1.0.0.zip",
+              "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/lan-transfer-v1.0.0.zip",
               "size": 57552,
               "sha256": "bda606650306a1c08751297d49b21739d5add79abf1af10cced5767b49cbb808",
               "signature": "awWrAUy7jZVUdWAp1n8HLDarcVPahPABde/SDHZqiDC8/nIUfm89/9EXzATsgmEGky3najzl9cC8p3G5tk+ADw=="

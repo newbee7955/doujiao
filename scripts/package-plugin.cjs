@@ -103,7 +103,7 @@ async function packagePlugin(pluginRelativeDir) {
   }
 
   // 构建 release 记录
-  const artifactUrl = `https://github.com/newbee7955/doujiao/releases/download/${id}-v${version}/${zipFileName}`;
+  const artifactUrl = `https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/${zipFileName}`;
   const newRelease = {
     version: manifest.version,
     channel: 'stable',
