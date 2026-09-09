@@ -236,15 +236,28 @@ export default function App(): JSX.Element {
   }
 
   // 卸载插件
-  const handleUninstall = async (pluginId: string) => {
+  const handleUninstall = async (pluginId: string, pluginName?: string) => {
+    const name = pluginName || pluginId
+    const confirmed = window.confirm(`确定要卸载插件【${name}】吗？\n卸载后将移除该插件在本地的所有版本和配置数据。`)
+    if (!confirmed) return
+
     if (!window.hostAPI?.uninstallPlugin) return
-    const res = await window.hostAPI.uninstallPlugin(pluginId)
-    if (res.success) {
-      if (activeTab === pluginId) {
-        setActiveTab('market')
+    try {
+      const res = await window.hostAPI.uninstallPlugin(pluginId)
+      if (res.success) {
+        setInstallMsg({ text: `插件【${name}】已成功卸载！`, type: 'success' })
+        if (activeTab === pluginId) {
+          setActiveTab('market')
+        }
+        await fetchPlugins()
+        await fetchMarket(true)
+      } else {
+        setInstallMsg({ text: `卸载失败，文件可能被系统占用，请稍后重试`, type: 'error' })
       }
-      await fetchPlugins()
-      await fetchMarket(true)
+    } catch (err: any) {
+      setInstallMsg({ text: `卸载异常: ${err?.message}`, type: 'error' })
+    } finally {
+      setTimeout(() => setInstallMsg(null), 4000)
     }
   }
 
@@ -374,30 +387,47 @@ export default function App(): JSX.Element {
               </div>
             ) : (
               plugins.map((plugin) => (
-                <button
+                <div
                   key={plugin.id}
-                  onClick={() => setActiveTab(plugin.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  className={`group relative w-full flex items-center justify-between rounded-lg transition-all ${
                     activeTab === plugin.id
                       ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                       : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
                   }`}
                 >
-                  <span className="text-base">
-                    {plugin.id.includes('douyin') ? '🎵' : plugin.id.includes('bilibili') ? '📺' : '🧩'}
-                  </span>
-                  <div className="text-left overflow-hidden">
-                    <div className="leading-none truncate">{plugin.name}</div>
-                    <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5">
-                      <span>v{plugin.version}</span>
-                      {plugin.isDev ? (
-                        <span className="text-amber-400/80">(Dev)</span>
-                      ) : (
-                        <span className="text-emerald-400/80">(不可变沙箱)</span>
-                      )}
+                  <button
+                    onClick={() => setActiveTab(plugin.id)}
+                    className="flex items-center gap-3 px-3 py-2.5 flex-1 min-w-0 text-left"
+                  >
+                    <span className="text-base flex-shrink-0">
+                      {plugin.id.includes('douyin') ? '🎵' : plugin.id.includes('bilibili') ? '📺' : '🧩'}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="leading-none truncate font-medium">{plugin.name}</div>
+                      <div className="text-[10px] text-slate-500 mt-1 flex items-center gap-1.5">
+                        <span>v{plugin.version}</span>
+                        {plugin.isDev ? (
+                          <span className="text-amber-400/80">(Dev)</span>
+                        ) : (
+                          <span className="text-emerald-400/80">(沙箱)</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
+                  </button>
+
+                  {!plugin.isDev && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleUninstall(plugin.id, plugin.name)
+                      }}
+                      title={`卸载插件 ${plugin.name}`}
+                      className="opacity-0 group-hover:opacity-100 p-2 mr-1 rounded-md hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-all text-xs flex-shrink-0"
+                    >
+                      🗑️
+                    </button>
+                  )}
+                </div>
               ))
             )}
 
@@ -584,7 +614,7 @@ export default function App(): JSX.Element {
 
                         {plugin.isInstalled && !plugin.isDev && (
                           <button
-                            onClick={() => handleUninstall(plugin.id)}
+                            onClick={() => handleUninstall(plugin.id, plugin.name)}
                             className="px-2.5 py-1 text-xs rounded bg-slate-800/80 hover:bg-rose-500/20 text-rose-400 font-medium transition-colors"
                           >
                             卸载
@@ -608,6 +638,79 @@ export default function App(): JSX.Element {
               </div>
 
               <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
+                {/* 已安装插件与卸载管理 */}
+                <div className="space-y-3 pb-5 border-b border-slate-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-medium text-white flex items-center gap-2">
+                        <span>已安装插件管理</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-mono bg-slate-800 text-slate-300 border border-slate-700">
+                          {plugins.length} 个
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        查看宿主已挂载的插件生命周期、沙箱隔离状态，支持一键安全彻底卸载
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveTab('market')}
+                      className="text-xs text-emerald-400 hover:underline"
+                    >
+                      前往市场安装 →
+                    </button>
+                  </div>
+
+                  {plugins.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-center text-xs text-slate-500">
+                      当前宿主处于纯净微内核状态，暂无已安装插件
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {plugins.map((p) => (
+                        <div
+                          key={p.id}
+                          className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">
+                              {p.id.includes('douyin') ? '🎵' : p.id.includes('bilibili') ? '📺' : '🧩'}
+                            </span>
+                            <div>
+                              <div className="text-sm font-semibold text-white flex items-center gap-2">
+                                <span>{p.name}</span>
+                                <span className="text-xs font-mono text-slate-400">v{p.version}</span>
+                                {p.isDev ? (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">Dev</span>
+                                ) : (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">沙箱隔离</span>
+                                )}
+                              </div>
+                              <div className="text-xs text-slate-500 font-mono mt-0.5">{p.id}</div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setActiveTab(p.id)}
+                              className="px-3 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-200 transition-colors"
+                            >
+                              打开
+                            </button>
+                            {!p.isDev && (
+                              <button
+                                onClick={() => handleUninstall(p.id, p.name)}
+                                className="px-3 py-1 text-xs rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 transition-colors"
+                              >
+                                彻底卸载
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* FFmpeg 独立组件配置 */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">

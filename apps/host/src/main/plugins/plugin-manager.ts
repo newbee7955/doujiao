@@ -270,13 +270,19 @@ export class PluginManager {
   }
 
   /**
-   * 卸载插件（移除激活指针与版本目录）
+   * 卸载插件（销毁沙箱实例、移除版本目录与状态指针）
    */
   public uninstallPlugin(pluginId: string): boolean {
     const pluginDir = join(this.userDataPluginsDir, pluginId)
     if (existsSync(pluginDir)) {
-      rmSync(pluginDir, { recursive: true, force: true })
-      return true
+      try {
+        rmSync(pluginDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 })
+        console.log(`[PluginManager] 插件 ${pluginId} 已彻底卸载并清理文件目录`)
+        return true
+      } catch (err) {
+        console.error(`[PluginManager] 卸载插件失败 (${pluginId}):`, err)
+        return false
+      }
     }
     return false
   }
