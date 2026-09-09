@@ -611,7 +611,7 @@ export class LanTransferService extends EventEmitter {
     }
 
     const clientDeviceId = urlObj.searchParams.get('id') || urlObj.searchParams.get('deviceId')
-    const currentDevice = this.recordDevice(req, clientDeviceId)
+    const currentDevice = this.recordDevice(req, clientDeviceId || undefined)
     const deviceName = currentDevice.deviceName
 
     // 6. SSE 实时事件流

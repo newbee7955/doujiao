@@ -7,6 +7,7 @@ import { PluginViewContainerManager } from './container/plugin-view'
 import { registerPluginIpcBridge } from './ipc/bridge'
 import { registerHostIpc } from './ipc/host-api'
 import { ProxyManager } from './network/proxy-manager'
+import { AppTrayManager } from './tray'
 
 // 0. 单实例互斥锁：防止多开冲突及底层 Chromium GPU/Disk Cache 文件锁定冲突 (0x5 ACCESS_DENIED)
 const gotTheLock = app.requestSingleInstanceLock()
@@ -23,6 +24,9 @@ registerPluginScheme()
 let mainWindow: BrowserWindow | null = null
 
 function createWindow(): BrowserWindow {
+  const trayManager = AppTrayManager.getInstance()
+  const iconPath = trayManager.getTrayIconPath()
+
   const win = new BrowserWindow({
     width: 1240,
     height: 820,
@@ -33,7 +37,7 @@ function createWindow(): BrowserWindow {
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     backgroundColor: '#0f172a',
-    icon: join(__dirname, '../../build/icon.png'),
+    icon: iconPath,
     webPreferences: {
       sandbox: true,               // 加固：开启沙箱
       contextIsolation: true,      // 加固：上下文隔离
@@ -49,6 +53,14 @@ function createWindow(): BrowserWindow {
 
   win.on('ready-to-show', () => {
     win.show()
+  })
+
+  // 拦截关闭事件：默认最小化到系统托盘，除非用户明确点击退出
+  win.on('close', (event) => {
+    if (!AppTrayManager.getInstance().getIsQuitting()) {
+      event.preventDefault()
+      win.hide()
+    }
   })
 
   // 初始化插件沙箱容器与 IPC
@@ -82,6 +94,9 @@ app.whenReady().then(async () => {
 
   mainWindow = createWindow()
 
+  // 3. 初始化系统托盘（支持点击/双击唤醒及右键退出菜单）
+  AppTrayManager.getInstance().init(mainWindow)
+
   // 监听多开事件，唤醒现有主窗口
   app.on('second-instance', () => {
     if (mainWindow) {
@@ -92,7 +107,11 @@ app.whenReady().then(async () => {
   })
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    } else if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createWindow()
     }
   })
@@ -105,5 +124,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  AppTrayManager.getInstance().setQuitting(true)
   PluginViewContainerManager.getInstance().destroyAll()
+  AppTrayManager.getInstance().destroy()
 })

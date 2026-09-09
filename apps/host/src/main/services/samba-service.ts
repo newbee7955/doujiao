@@ -553,8 +553,8 @@ export class SambaService {
           }
         }, 500)
 
-        readStream.on('data', (chunk: Buffer) => {
-          transferred += chunk.length
+        readStream.on('data', (chunk: Buffer | string) => {
+          transferred += typeof chunk === 'string' ? Buffer.byteLength(chunk) : chunk.length
         })
 
         readStream.on('error', (err: any) => {

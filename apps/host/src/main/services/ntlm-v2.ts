@@ -191,7 +191,7 @@ export function decodeType2Message(buf: Buffer): Type2Info {
     const targetInfoLength = buf.readUInt16LE(40)
     const targetInfoOffset = buf.readUInt32LE(44)
     if (targetInfoLength > 0 && targetInfoOffset + targetInfoLength <= buf.length) {
-      targetInfoBuffer = buf.subarray(targetInfoOffset, targetInfoOffset + targetInfoLength)
+      targetInfoBuffer = Buffer.from(buf.subarray(targetInfoOffset, targetInfoOffset + targetInfoLength))
     }
   }
 

@@ -7,11 +7,14 @@ directories:
   buildResources: build
 files:
   - out/**/*
+  - build/icon.ico
+  - build/icon.png
   - package.json
 extraResources:
   - from: ../../registry
     to: registry
 win:
+  icon: build/icon.ico
   target:
     - target: nsis
       arch:
@@ -24,4 +27,8 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: 豆角工具箱
   uninstallDisplayName: 豆角工具箱
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
   artifactName: "${productName}-Setup-${version}.${ext}"
+

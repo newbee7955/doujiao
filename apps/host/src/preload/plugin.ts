@@ -11,8 +11,8 @@ let registeredLifecycle: PluginLifecycle | null = null
 
 // 从沙箱自定义协议 URL (如 doujiao-plugin://<plugin-id>/index.html) 动态解析宿主分配的真实 pluginId
 const currentPluginId =
-  typeof window !== 'undefined' && window.location?.hostname
-    ? window.location.hostname
+  typeof globalThis !== 'undefined' && (globalThis as any).window?.location?.hostname
+    ? (globalThis as any).window.location.hostname
     : 'plugin-sandbox'
 
 const sdk: DoujiaoSDK = {
