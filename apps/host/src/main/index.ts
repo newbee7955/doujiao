@@ -8,6 +8,15 @@ import { registerPluginIpcBridge } from './ipc/bridge'
 import { registerHostIpc } from './ipc/host-api'
 import { ProxyManager } from './network/proxy-manager'
 
+// 0. 单实例互斥锁：防止多开冲突及底层 Chromium GPU/Disk Cache 文件锁定冲突 (0x5 ACCESS_DENIED)
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+  console.log('[Host] 检测到已有实例正在运行，自动退出当前重复进程并唤醒主窗口')
+  app.quit()
+  process.exit(0)
+}
+
 // 1. 必须在 app ready 之前声明自定义协议特权
 registerPluginScheme()
 
@@ -55,6 +64,11 @@ function createWindow(): BrowserWindow {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  win.on('closed', () => {
+    containerManager.destroyAll()
+    mainWindow = null
+  })
+
   return win
 }
 
@@ -67,6 +81,15 @@ app.whenReady().then(async () => {
 
   mainWindow = createWindow()
 
+  // 监听多开事件，唤醒现有主窗口
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.show()
+      mainWindow.focus()
+    }
+  })
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createWindow()
@@ -78,4 +101,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  PluginViewContainerManager.getInstance().destroyAll()
 })

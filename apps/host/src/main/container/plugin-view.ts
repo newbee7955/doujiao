@@ -126,6 +126,26 @@ export class PluginViewContainerManager {
     }
   }
 
+  /**
+   * 销毁所有插件沙箱视图（主窗口退出或关闭时彻底释放资源，防止孤儿进程残留）
+   */
+  public destroyAll(): void {
+    for (const [pluginId, instance] of this.views.entries()) {
+      try {
+        if (instance.isAttached && this.mainWindow) {
+          this.mainWindow.contentView.removeChildView(instance.view)
+        }
+        if (!instance.view.webContents.isDestroyed()) {
+          instance.view.webContents.close()
+        }
+      } catch (err) {
+        console.warn(`[PluginView] 销毁插件视图 ${pluginId} 异常:`, err)
+      }
+    }
+    this.views.clear()
+    this.activePluginId = null
+  }
+
   private createPluginView(pluginId: string): PluginViewInstance {
     const pluginPreloadPath = existsSync(join(__dirname, '../preload/plugin.cjs'))
       ? join(__dirname, '../preload/plugin.cjs')
