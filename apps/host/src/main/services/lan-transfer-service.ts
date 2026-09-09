@@ -24,6 +24,7 @@ interface ConnectedDevice {
   deviceName: string
   ip: string
   lastSeen: number
+  sseCount: number
 }
 
 export class LanTransferService extends EventEmitter {
@@ -40,6 +41,13 @@ export class LanTransferService extends EventEmitter {
   private messages: LanTransferMessage[] = []
   private connectedDevices = new Map<string, ConnectedDevice>()
   private sseClients = new Set<http.ServerResponse>()
+  private deviceSseMap = new Map<http.ServerResponse, string>()
+  private cleanupTimer: NodeJS.Timeout | null = null
+
+  private authEnabled = true
+  private authPin = this.generatePin()
+  private autoPinInQr = true
+  private authTokens = new Set<string>()
 
   private constructor() {
     super()
@@ -54,6 +62,10 @@ export class LanTransferService extends EventEmitter {
       LanTransferService.instance = new LanTransferService()
     }
     return LanTransferService.instance
+  }
+
+  private generatePin(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString()
   }
 
   // --- 配置加载与持久化 ---
@@ -71,6 +83,15 @@ export class LanTransferService extends EventEmitter {
         if (data.messages && Array.isArray(data.messages)) {
           this.messages = data.messages.slice(-50)
         }
+        if (data.authEnabled !== undefined) {
+          this.authEnabled = !!data.authEnabled
+        }
+        if (data.authPin && typeof data.authPin === 'string') {
+          this.authPin = data.authPin
+        }
+        if (data.autoPinInQr !== undefined) {
+          this.autoPinInQr = !!data.autoPinInQr
+        }
       } catch (err) {
         console.warn('[LanTransferService] 加载配置文件失败:', err)
       }
@@ -82,7 +103,10 @@ export class LanTransferService extends EventEmitter {
       const data = {
         saveDirectory: this.saveDirectory,
         receivedFiles: this.receivedFiles,
-        messages: this.messages.slice(-50)
+        messages: this.messages.slice(-50),
+        authEnabled: this.authEnabled,
+        authPin: this.authPin,
+        autoPinInQr: this.autoPinInQr
       }
       fs.writeFileSync(this.configFile, JSON.stringify(data, null, 2), 'utf-8')
     } catch (err) {
@@ -234,6 +258,7 @@ export class LanTransferService extends EventEmitter {
 
     this.currentPort = await listenServer(desiredPort)
     this.running = true
+    this.startHousekeeping()
     console.log(`[LanTransferService] 服务已启动: http://${this.currentIp}:${this.currentPort}`)
 
     this.emitEvent({
@@ -250,6 +275,8 @@ export class LanTransferService extends EventEmitter {
       return true
     }
 
+    this.stopHousekeeping()
+
     // 关闭所有活跃的 SSE 客户端连接
     for (const client of this.sseClients) {
       try {
@@ -257,6 +284,8 @@ export class LanTransferService extends EventEmitter {
       } catch {}
     }
     this.sseClients.clear()
+    this.deviceSseMap.clear()
+    this.connectedDevices.clear()
 
     return new Promise((resolve) => {
       this.server?.close(() => {
@@ -278,6 +307,75 @@ export class LanTransferService extends EventEmitter {
     return this.getStatus()
   }
 
+  // --- 验证码与安全配置 ---
+  public async setAuthEnabled(enabled: boolean): Promise<LanTransferServerStatus> {
+    this.authEnabled = enabled
+    this.saveConfig()
+    this.broadcastSse('auth-changed', { authEnabled: this.authEnabled })
+    const status = await this.getStatus()
+    this.emitEvent({ type: 'server-status', payload: status })
+    return status
+  }
+
+  public async refreshPin(): Promise<LanTransferServerStatus> {
+    this.authPin = this.generatePin()
+    this.authTokens.clear()
+    this.saveConfig()
+    this.broadcastSse('auth-changed', { authEnabled: this.authEnabled, pinRefreshed: true })
+    const status = await this.getStatus()
+    this.emitEvent({ type: 'server-status', payload: status })
+    return status
+  }
+
+  public async setAutoPinInQr(enabled: boolean): Promise<LanTransferServerStatus> {
+    this.autoPinInQr = enabled
+    this.saveConfig()
+    const status = await this.getStatus()
+    this.emitEvent({ type: 'server-status', payload: status })
+    return status
+  }
+
+  // --- 心跳保活与自动清理定时器 ---
+  private startHousekeeping(): void {
+    if (this.cleanupTimer) return
+    this.cleanupTimer = setInterval(() => {
+      this.housekeeping()
+    }, 2000)
+  }
+
+  private stopHousekeeping(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer)
+      this.cleanupTimer = null
+    }
+  }
+
+  private housekeeping(): void {
+    const now = Date.now()
+    const toRemove: string[] = []
+
+    for (const [id, dev] of this.connectedDevices.entries()) {
+      // 若无活跃 SSE 连接且超过 7 秒无心跳，或者有活跃 SSE 但超过 15 秒无任何交互
+      const timeoutLimit = (dev.sseCount || 0) > 0 ? 15000 : 7000
+      if (now - dev.lastSeen > timeoutLimit) {
+        toRemove.push(id)
+      }
+    }
+
+    for (const id of toRemove) {
+      const dev = this.connectedDevices.get(id)
+      if (dev) {
+        this.connectedDevices.delete(id)
+        console.log(`[LanTransferService] 设备下线 (超时清理): ${dev.deviceName} (${dev.ip})`)
+        this.emitEvent({
+          type: 'device-disconnected',
+          payload: { deviceId: dev.id, deviceName: dev.deviceName, ip: dev.ip }
+        })
+        this.broadcastSse('device-count', { count: this.connectedDevices.size })
+      }
+    }
+  }
+
   // --- 获取当前服务状态 ---
   public async getStatus(): Promise<LanTransferServerStatus> {
     const allIps = this.getAvailableIps()
@@ -285,12 +383,13 @@ export class LanTransferService extends EventEmitter {
       this.currentIp = (allIps.find((i) => i.isDefault) || allIps[0]).ip
     }
 
-    const url = `http://${this.currentIp}:${this.currentPort}`
+    const baseUrl = `http://${this.currentIp}:${this.currentPort}`
+    const url = this.running && this.authEnabled && this.autoPinInQr
+      ? `${baseUrl}?pin=${this.authPin}`
+      : baseUrl
     const qrCodeSvg = this.running ? await this.generateQrCodeSvg(url) : ''
 
-    const devices = Array.from(this.connectedDevices.values()).filter(
-      (d) => Date.now() - d.lastSeen < 120000
-    )
+    const devices = Array.from(this.connectedDevices.values())
 
     return {
       running: this.running,
@@ -300,7 +399,10 @@ export class LanTransferService extends EventEmitter {
       url,
       qrCodeSvg,
       connectedDevices: devices,
-      saveDirectory: this.saveDirectory
+      saveDirectory: this.saveDirectory,
+      authEnabled: this.authEnabled,
+      authPin: this.authPin,
+      autoPinInQr: this.autoPinInQr
     }
   }
 
@@ -318,30 +420,53 @@ export class LanTransferService extends EventEmitter {
     return '移动设备'
   }
 
-  private recordDevice(req: http.IncomingMessage): string {
+  private recordDevice(req: http.IncomingMessage, explicitId?: string, customName?: string): ConnectedDevice {
     const ip = req.socket.remoteAddress?.replace(/^.*:/, '') || '127.0.0.1'
     const ua = req.headers['user-agent'] || ''
-    const deviceName = this.identifyDevice(ua)
-    const deviceId = `${ip}_${deviceName}`
+    const deviceName = customName || this.identifyDevice(ua)
+    const deviceId = explicitId || `${ip}_${deviceName}`
 
     const existing = this.connectedDevices.get(deviceId)
     if (!existing) {
-      this.connectedDevices.set(deviceId, {
+      const dev: ConnectedDevice = {
         id: deviceId,
         deviceName,
         ip,
-        lastSeen: Date.now()
-      })
+        lastSeen: Date.now(),
+        sseCount: 0
+      }
+      this.connectedDevices.set(deviceId, dev)
+      console.log(`[LanTransferService] 设备上线: ${deviceName} (${ip}) id=${deviceId}`)
       this.emitEvent({
         type: 'device-connected',
-        payload: { deviceName, ip }
+        payload: { deviceId, deviceName, ip }
       })
       this.broadcastSse('device-count', { count: this.connectedDevices.size })
+      return dev
     } else {
       existing.lastSeen = Date.now()
+      if (customName && customName !== existing.deviceName) {
+        existing.deviceName = customName
+      }
+      return existing
     }
+  }
 
-    return deviceName
+  private checkAuth(req: http.IncomingMessage, urlObj: URL): boolean {
+    if (!this.authEnabled) return true
+
+    const authHeader = req.headers['authorization'] || ''
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '').trim()
+    const customToken = (req.headers['x-auth-token'] as string) || ''
+    const queryToken = urlObj.searchParams.get('token') || ''
+    const queryPin = urlObj.searchParams.get('pin') || ''
+
+    if (bearerToken && this.authTokens.has(bearerToken)) return true
+    if (customToken && this.authTokens.has(customToken)) return true
+    if (queryToken && this.authTokens.has(queryToken)) return true
+    if (queryPin && queryPin === this.authPin) return true
+
+    return false
   }
 
   // --- SSE 实时推送 ---
@@ -376,8 +501,6 @@ export class LanTransferService extends EventEmitter {
       return
     }
 
-    const deviceName = this.recordDevice(req)
-
     // 1. 移动端 H5 主页
     if (pathname === '/' || pathname === '/index.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
@@ -385,7 +508,7 @@ export class LanTransferService extends EventEmitter {
       return
     }
 
-    // 2. 状态查询 API
+    // 2. 状态查询 API（供未认证手机探测环境）
     if (pathname === '/api/status' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/json' })
       res.end(
@@ -394,13 +517,104 @@ export class LanTransferService extends EventEmitter {
           os: `${os.type()} ${os.release()}`,
           ip: this.currentIp,
           port: this.currentPort,
-          saveDirectory: this.saveDirectory
+          saveDirectory: this.saveDirectory,
+          authRequired: this.authEnabled
         })
       )
       return
     }
 
-    // 3. SSE 实时事件流
+    // 3. 验证码校验 API
+    if (pathname === '/api/auth/verify' && method === 'POST') {
+      let body = ''
+      req.on('data', (chunk) => (body += chunk))
+      req.on('end', () => {
+        try {
+          const parsed = JSON.parse(body || '{}')
+          const submittedPin = (parsed.pin || '').trim()
+          const clientDeviceName = (parsed.deviceName || '').trim()
+          const clientDeviceId = (parsed.deviceId || '').trim()
+
+          if (!this.authEnabled || submittedPin === this.authPin) {
+            const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
+            this.authTokens.add(token)
+            const dev = this.recordDevice(req, clientDeviceId, clientDeviceName)
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(
+              JSON.stringify({
+                success: true,
+                token,
+                deviceId: dev.id,
+                deviceName: dev.deviceName
+              })
+            )
+          } else {
+            res.writeHead(401, { 'Content-Type': 'application/json' })
+            res.end(
+              JSON.stringify({
+                success: false,
+                error: '验证码错误，请重新核对电脑端显示的 6 位 PIN 码'
+              })
+            )
+          }
+        } catch (e: any) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ success: false, error: '请求数据格式错误' }))
+        }
+      })
+      return
+    }
+
+    // 4. 设备退出通知（手机关闭网页或卸载页面上报）
+    if (pathname === '/api/leave') {
+      const deviceId = urlObj.searchParams.get('id') || urlObj.searchParams.get('deviceId')
+      if (deviceId && this.connectedDevices.has(deviceId)) {
+        const dev = this.connectedDevices.get(deviceId)!
+        this.connectedDevices.delete(deviceId)
+        console.log(`[LanTransferService] 手机端主动离开: ${dev.deviceName} (${dev.ip}) id=${deviceId}`)
+        this.emitEvent({
+          type: 'device-disconnected',
+          payload: { deviceId: dev.id, deviceName: dev.deviceName, ip: dev.ip }
+        })
+        this.broadcastSse('device-count', { count: this.connectedDevices.size })
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: true }))
+      return
+    }
+
+    // 5. 设备保活心跳
+    if (pathname === '/api/heartbeat') {
+      if (!this.checkAuth(req, urlObj)) {
+        res.writeHead(401, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Unauthorized', needPin: true }))
+        return
+      }
+      const deviceId = urlObj.searchParams.get('id') || urlObj.searchParams.get('deviceId')
+      if (deviceId && this.connectedDevices.has(deviceId)) {
+        const dev = this.connectedDevices.get(deviceId)!
+        dev.lastSeen = Date.now()
+      } else if (deviceId) {
+        this.recordDevice(req, deviceId)
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: true, timestamp: Date.now() }))
+      return
+    }
+
+    // --- 受控鉴权拦截 ---
+    if (!this.checkAuth(req, urlObj)) {
+      res.writeHead(401, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ success: false, error: 'Unauthorized', needPin: true }))
+      return
+    }
+
+    const clientDeviceId = urlObj.searchParams.get('id') || urlObj.searchParams.get('deviceId')
+    const currentDevice = this.recordDevice(req, clientDeviceId)
+    const deviceName = currentDevice.deviceName
+
+    // 6. SSE 实时事件流
     if (pathname === '/api/events' && method === 'GET') {
       res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -409,9 +623,21 @@ export class LanTransferService extends EventEmitter {
       })
       res.write(`event: init\ndata: ${JSON.stringify({ connected: true })}\n\n`)
       this.sseClients.add(res)
+      this.deviceSseMap.set(res, currentDevice.id)
+      currentDevice.sseCount = (currentDevice.sseCount || 0) + 1
 
       req.on('close', () => {
         this.sseClients.delete(res)
+        const dId = this.deviceSseMap.get(res)
+        this.deviceSseMap.delete(res)
+        if (dId && this.connectedDevices.has(dId)) {
+          const target = this.connectedDevices.get(dId)!
+          target.sseCount = Math.max(0, (target.sseCount || 1) - 1)
+          if (target.sseCount === 0) {
+            // 当 SSE 连接断开且无其它活跃连接时，将 lastSeen 提前以触发快速离线清理
+            target.lastSeen = Date.now() - 5000
+          }
+        }
       })
       return
     }
@@ -1011,10 +1237,68 @@ export class LanTransferService extends EventEmitter {
       z-index: 100;
       display: none;
     }
+    .auth-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .auth-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 20px;
+      padding: 28px 22px;
+      width: 100%;
+      max-width: 360px;
+      text-align: center;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .auth-icon { font-size: 40px; margin-bottom: 12px; }
+    .auth-title { font-size: 18px; font-weight: 700; color: #f8fafc; margin-bottom: 6px; }
+    .auth-desc { font-size: 13px; color: #94a3b8; margin-bottom: 20px; line-height: 1.5; }
+    .pin-input {
+      width: 100%;
+      height: 52px;
+      background: #0f172a;
+      border: 2px solid #38bdf8;
+      border-radius: 12px;
+      color: #38bdf8;
+      font-size: 26px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 8px;
+      outline: none;
+      margin-bottom: 12px;
+      box-sizing: border-box;
+    }
+    .auth-error {
+      color: #f43f5e;
+      font-size: 12px;
+      margin-bottom: 14px;
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div id="toast" class="toast"></div>
+
+  <!-- 连接验证码模态窗 -->
+  <div id="authModal" class="auth-modal" style="display: none;">
+    <div class="auth-card">
+      <div class="auth-icon">🔒</div>
+      <div class="auth-title">局域网连接验证</div>
+      <div class="auth-desc">为保障文件与剪贴板安全，请输入电脑屏幕上显示的 6 位连接验证码</div>
+      <input type="tel" id="pinInput" maxlength="6" pattern="[0-9]*" class="pin-input" placeholder="000000" onkeydown="if(event.key==='Enter') submitPin()">
+      <div id="authError" class="auth-error">验证码错误，请核对电脑端 PIN 码</div>
+      <button class="btn-action btn-primary" onclick="submitPin()">立即配对连接</button>
+    </div>
+  </div>
 
   <header>
     <div class="logo-area">
@@ -1092,6 +1376,13 @@ export class LanTransferService extends EventEmitter {
 
   <script>
     let wakeLock = null;
+    let authToken = sessionStorage.getItem('doujiao_lan_token') || '';
+    let deviceId = localStorage.getItem('doujiao_lan_dev_id') || '';
+    if (!deviceId) {
+      deviceId = 'dev_' + Math.random().toString(36).slice(2, 9);
+      localStorage.setItem('doujiao_lan_dev_id', deviceId);
+    }
+
     async function requestWakeLock() {
       if ('wakeLock' in navigator) {
         try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){}
@@ -1134,6 +1425,84 @@ export class LanTransferService extends EventEmitter {
       if (['pdf','doc','docx','txt','md'].includes(ext)) return '📄';
       return '📁';
     }
+
+    // --- 认证请求封装 ---
+    function authFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authToken) {
+        if (options.headers instanceof Headers) {
+          options.headers.set('Authorization', 'Bearer ' + authToken);
+          options.headers.set('x-auth-token', authToken);
+        } else {
+          options.headers['Authorization'] = 'Bearer ' + authToken;
+          options.headers['x-auth-token'] = authToken;
+        }
+      }
+      return fetch(url, options);
+    }
+
+    async function submitPin(autoPin) {
+      const pin = autoPin || document.getElementById('pinInput').value.trim();
+      const errEl = document.getElementById('authError');
+      if (!pin) {
+        errEl.innerText = '请输入 6 位数字验证码';
+        errEl.style.display = 'block';
+        return;
+      }
+      try {
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin, deviceId })
+        });
+        const data = await res.json();
+        if (data.success && data.token) {
+          authToken = data.token;
+          sessionStorage.setItem('doujiao_lan_token', authToken);
+          document.getElementById('authModal').style.display = 'none';
+          errEl.style.display = 'none';
+          showToast('🎉 连接配对成功！');
+          onAuthenticated();
+        } else {
+          errEl.innerText = data.error || '验证码错误，请核对电脑端显示的 6 位 PIN 码';
+          errEl.style.display = 'block';
+          document.getElementById('authModal').style.display = 'flex';
+        }
+      } catch (err) {
+        errEl.innerText = '网络连接异常，请重试';
+        errEl.style.display = 'block';
+      }
+    }
+
+    // --- 心跳保活与离开通知 ---
+    let heartbeatTimer = null;
+    function startHeartbeat() {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = setInterval(() => {
+        authFetch('/api/heartbeat?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken))
+          .catch(() => {});
+      }, 4000);
+    }
+
+    function notifyLeave() {
+      try {
+        const url = '/api/leave?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken);
+        if (navigator.sendBeacon) {
+          navigator.sendBeacon(url);
+        } else {
+          fetch(url, { method: 'POST', keepalive: true }).catch(() => {});
+        }
+      } catch (e) {}
+    }
+    window.addEventListener('pagehide', notifyLeave);
+    window.addEventListener('beforeunload', notifyLeave);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        authFetch('/api/heartbeat?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken)).catch(() => {});
+        fetchFiles();
+      }
+    });
 
     // --- 上传处理 ---
     async function handleFileSelect(input) {
@@ -1178,13 +1547,20 @@ export class LanTransferService extends EventEmitter {
             if (xhr.status === 200) {
               addSentRecord(file.name, file.size);
               resolve();
+            } else if (xhr.status === 401) {
+              document.getElementById('authModal').style.display = 'flex';
+              reject(new Error('未授权'));
             } else {
               reject(new Error('上传失败'));
             }
           };
 
           xhr.onerror = () => reject(new Error('网络错误'));
-          xhr.open('POST', '/api/upload', true);
+          xhr.open('POST', '/api/upload?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken), true);
+          if (authToken) {
+            xhr.setRequestHeader('Authorization', 'Bearer ' + authToken);
+            xhr.setRequestHeader('x-auth-token', authToken);
+          }
           xhr.send(formData);
         });
       }
@@ -1208,7 +1584,11 @@ export class LanTransferService extends EventEmitter {
     // --- 获取电脑文件 ---
     async function fetchFiles() {
       try {
-        const res = await fetch('/api/files');
+        const res = await authFetch('/api/files?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken));
+        if (res.status === 401) {
+          document.getElementById('authModal').style.display = 'flex';
+          return;
+        }
         const data = await res.json();
         const list = document.getElementById('downloadFileList');
         document.getElementById('pcFileCount').innerText = data.files ? data.files.length : 0;
@@ -1219,6 +1599,7 @@ export class LanTransferService extends EventEmitter {
         }
 
         list.innerHTML = data.files.map(f => {
+          const dlUrl = '/api/download/' + encodeURIComponent(f.id) + '?token=' + encodeURIComponent(authToken) + '&id=' + encodeURIComponent(deviceId);
           return '<div class="file-item">' +
             '<div class="file-info">' +
               '<span class="file-icon">' + getIcon(f.name) + '</span>' +
@@ -1227,7 +1608,7 @@ export class LanTransferService extends EventEmitter {
                 '<div class="file-meta">' + formatSize(f.size) + '</div>' +
               '</div>' +
             '</div>' +
-            '<a href="/api/download/' + f.id + '" class="file-dl-btn" download>下载</a>' +
+            '<a href="' + dlUrl + '" class="file-dl-btn" download>下载</a>' +
           '</div>';
         }).join('');
       } catch (err) {
@@ -1238,7 +1619,11 @@ export class LanTransferService extends EventEmitter {
     // --- 文本互传 ---
     async function fetchMessages() {
       try {
-        const res = await fetch('/api/messages');
+        const res = await authFetch('/api/messages?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken));
+        if (res.status === 401) {
+          document.getElementById('authModal').style.display = 'flex';
+          return;
+        }
         const data = await res.json();
         renderMessages(data.messages || []);
       } catch (err) {}
@@ -1270,11 +1655,15 @@ export class LanTransferService extends EventEmitter {
       input.value = '';
 
       try {
-        const res = await fetch('/api/messages', {
+        const res = await authFetch('/api/messages?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text })
         });
+        if (res.status === 401) {
+          document.getElementById('authModal').style.display = 'flex';
+          return;
+        }
         const data = await res.json();
         if (data.success) {
           fetchMessages();
@@ -1307,23 +1696,59 @@ export class LanTransferService extends EventEmitter {
     }
 
     // --- SSE 实时感知 ---
+    let es = null;
     function initEventSource() {
-      const es = new EventSource('/api/events');
+      if (es) { try { es.close(); } catch(e){} }
+      const url = '/api/events?id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(authToken);
+      es = new EventSource(url);
       es.addEventListener('files-updated', () => { fetchFiles(); showToast('电脑端更新了共享文件'); });
       es.addEventListener('message-received', (e) => {
         fetchMessages();
         const data = JSON.parse(e.data);
         if (data.sender !== 'mobile') showToast('收到来自电脑的新文字');
       });
+      es.addEventListener('auth-changed', (e) => {
+        const data = JSON.parse(e.data || '{}');
+        if (data.pinRefreshed) {
+          sessionStorage.removeItem('doujiao_lan_token');
+          authToken = '';
+          document.getElementById('authModal').style.display = 'flex';
+          showToast('电脑端已刷新验证码，请重新输入');
+        }
+      });
       es.onerror = () => { setTimeout(initEventSource, 5000); };
     }
 
-    // 初始化
+    function onAuthenticated() {
+      startHeartbeat();
+      initEventSource();
+      fetchFiles();
+      fetchMessages();
+    }
+
+    // 初始化入口
     fetch('/api/status').then(r => r.json()).then(d => {
       document.getElementById('pcNameDisplay').innerText = d.pcName || '电脑已在线';
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const pinInUrl = urlParams.get('pin');
+
+      if (pinInUrl) {
+        // 扫码自带 PIN，静默自动连接
+        submitPin(pinInUrl);
+        // 清除 URL 中的 PIN，避免分享泄露
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (authToken) {
+        // 已有会话，直接进入
+        onAuthenticated();
+      } else if (d.authRequired) {
+        // 需要验证码，显示模态窗
+        document.getElementById('authModal').style.display = 'flex';
+      } else {
+        // 免密直连
+        onAuthenticated();
+      }
     });
-    fetchFiles();
-    initEventSource();
   </script>
 </body>
 </html>`

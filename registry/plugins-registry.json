@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 20,
-  "updatedAt": "2026-09-09T14:56:37.274Z",
+  "registryVersion": 21,
+  "updatedAt": "2026-09-09T15:15:23.602Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -334,7 +334,7 @@
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T14:39:52.327Z",
+          "publishedAt": "2026-09-09T15:15:23.602Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -350,9 +350,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://raw.githubusercontent.com/newbee7955/doujiao/main/registry/releases/lan-transfer-v1.0.0.zip",
-              "size": 57552,
-              "sha256": "bda606650306a1c08751297d49b21739d5add79abf1af10cced5767b49cbb808",
-              "signature": "awWrAUy7jZVUdWAp1n8HLDarcVPahPABde/SDHZqiDC8/nIUfm89/9EXzATsgmEGky3najzl9cC8p3G5tk+ADw=="
+              "size": 58389,
+              "sha256": "89bb0f6ffabd5acce382c29e1e773d8e6b51ddb764003801d4422d577859bd34",
+              "signature": "2/rnkyFVZ0X6/qQH7O7XmXGrpVD9kj2eykC9RrAre151O5wkqqbLToTO1pLmNgtkilOLm4+rgHc18JcrSPa/Dg=="
             }
           ]
         }

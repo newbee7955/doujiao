@@ -369,6 +369,21 @@ export function registerPluginIpcBridge(): void {
     return lanService.switchIp(ip)
   })
 
+  ipcMain.handle('plugin:lan:set-auth-enabled', async (event, enabled: boolean) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.setAuthEnabled(enabled)
+  })
+
+  ipcMain.handle('plugin:lan:refresh-pin', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.refreshPin()
+  })
+
+  ipcMain.handle('plugin:lan:set-auto-pin-in-qr', async (event, enabled: boolean) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.setAutoPinInQr(enabled)
+  })
+
   ipcMain.handle('plugin:lan:add-share-files', async (event, filePaths: string[]) => {
     await checkLanPermission(event.sender.id)
     return lanService.addShareFiles(filePaths)

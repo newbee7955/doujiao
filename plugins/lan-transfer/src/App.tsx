@@ -68,13 +68,22 @@ export default function App(): JSX.Element {
           } else if (event.type === 'device-connected') {
             s.lan?.getStatus().then(setStatus)
             showToast(`📱 新设备已连接: ${event.payload?.deviceName}`)
+          } else if (event.type === 'device-disconnected') {
+            s.lan?.getStatus().then(setStatus)
+            showToast(`👋 设备已断开: ${event.payload?.deviceName || '手机'}`)
           } else if (event.type === 'server-status') {
             s.lan?.getStatus().then(setStatus)
           }
         })
 
+        // 4. 定期保底轮询，保持设备在线状态与后台严格同步
+        const timer = setInterval(() => {
+          s.lan?.getStatus().then(setStatus)
+        }, 3000)
+
         return () => {
           unsubscribe?.()
+          clearInterval(timer)
         }
       }
     } catch (err) {
@@ -138,6 +147,32 @@ export default function App(): JSX.Element {
     const s = await sdk.lan.switchIp(ip)
     setStatus(s)
     showToast(`已切换绑定 IP 至: ${ip}`)
+  }
+
+  // 切换验证码保护
+  const handleToggleAuth = async () => {
+    if (!sdk?.lan || !status) return
+    const next = !status.authEnabled
+    const s = await sdk.lan.setAuthEnabled(next)
+    setStatus(s)
+    showToast(next ? '已开启连接验证码保护' : '已关闭验证码（允许局域网免密访问）')
+  }
+
+  // 刷新验证码
+  const handleRefreshPin = async () => {
+    if (!sdk?.lan) return
+    const s = await sdk.lan.refreshPin()
+    setStatus(s)
+    showToast('已刷新 6 位连接验证码')
+  }
+
+  // 切换二维码自动携带验证码
+  const handleToggleAutoPinInQr = async () => {
+    if (!sdk?.lan || !status) return
+    const next = !status.autoPinInQr
+    const s = await sdk.lan.setAutoPinInQr(next)
+    setStatus(s)
+    showToast(next ? '二维码已附带验证码（扫码免手输）' : '二维码不附带验证码（需手动输入）')
   }
 
   // 更改接收目录
@@ -374,6 +409,80 @@ export default function App(): JSX.Element {
                 </div>
               )}
             </div>
+
+            {/* 连接验证码卡片 */}
+            {status?.running && (
+              <div className="mt-3.5 bg-slate-950/80 border border-slate-800 rounded-xl p-3 shadow-md">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+                    <span>🔒 连接验证码</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        status?.authEnabled
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-slate-800 text-slate-400'
+                      }`}
+                    >
+                      {status?.authEnabled ? '已启用' : '已关闭'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleToggleAuth}
+                    className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
+                      status?.authEnabled
+                        ? 'text-slate-400 hover:text-rose-400'
+                        : 'text-emerald-400 hover:text-emerald-300'
+                    }`}
+                    title={status?.authEnabled ? '点击关闭验证码（免密模式）' : '点击开启验证码保护'}
+                  >
+                    {status?.authEnabled ? '关闭' : '开启'}
+                  </button>
+                </div>
+
+                {status?.authEnabled ? (
+                  <div>
+                    <div className="flex items-center justify-between bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-2">
+                      <span className="font-mono text-lg font-bold tracking-widest text-sky-400">
+                        {status?.authPin ? `${status.authPin.slice(0, 3)} ${status.authPin.slice(3)}` : '------'}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={handleRefreshPin}
+                          className="px-2 py-1 text-[11px] text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition-colors"
+                          title="刷新验证码"
+                        >
+                          🔄 换一个
+                        </button>
+                        <button
+                          onClick={() => handleCopyText(status?.authPin || '')}
+                          className="px-2 py-1 text-[11px] text-slate-400 hover:text-sky-400 hover:bg-slate-800 rounded transition-colors"
+                          title="复制验证码"
+                        >
+                          📋 复制
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={status?.autoPinInQr ?? true}
+                          onChange={handleToggleAutoPinInQr}
+                          className="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5"
+                        />
+                        <span>扫码自动携带验证码</span>
+                      </label>
+                      <span className="text-[10px] text-slate-500">免手动输入</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 py-0.5">
+                    当前处于免密直连模式，同 Wi-Fi 设备可直接访问。
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* 极简步骤引导 */}
             <div className="mt-4 bg-slate-950/40 border border-slate-800/80 rounded-xl p-3.5 text-xs text-slate-400 space-y-2">

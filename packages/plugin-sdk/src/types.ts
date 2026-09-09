@@ -190,6 +190,9 @@ export interface LanTransferServerStatus {
   qrCodeSvg: string;
   connectedDevices: Array<{ id: string; deviceName: string; ip: string; lastSeen: number }>;
   saveDirectory: string;
+  authEnabled: boolean;
+  authPin: string;
+  autoPinInQr: boolean;
 }
 
 export interface LanTransferSharedFile {
@@ -226,6 +229,7 @@ export interface LanTransferEvent {
     | 'file-received'
     | 'message-received'
     | 'device-connected'
+    | 'device-disconnected'
     | 'share-downloaded'
     | 'upload-progress'
     | 'server-status';
@@ -300,6 +304,9 @@ export interface DoujiaoSDK {
     stopServer(): Promise<boolean>;
     getStatus(): Promise<LanTransferServerStatus>;
     switchIp(ip: string): Promise<LanTransferServerStatus>;
+    setAuthEnabled(enabled: boolean): Promise<LanTransferServerStatus>;
+    refreshPin(): Promise<LanTransferServerStatus>;
+    setAutoPinInQr(enabled: boolean): Promise<LanTransferServerStatus>;
     addShareFiles(filePaths: string[]): Promise<LanTransferSharedFile[]>;
     removeShareFile(id: string): Promise<boolean>;
     getShareFiles(): Promise<LanTransferSharedFile[]>;
