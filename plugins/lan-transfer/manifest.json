@@ -1,0 +1,21 @@
+{
+  "$schema": "https://doujiao.app/schemas/plugin-manifest.v2.json",
+  "id": "lan-transfer",
+  "publisher": "doujiao-official",
+  "name": "局域网快传",
+  "version": "1.0.0",
+  "description": "局域网跨设备文件传输助手：电脑与手机双向互传、手机扫码免装 App 秒连、大文件流式秒传、局域网文本与剪贴板极速同步",
+  "icon": "⚡",
+  "engines": {
+    "doujiao": ">=0.2.0 <0.3.0",
+    "pluginApi": "^1.0.0"
+  },
+  "entrypoints": {
+    "ui": "dist/index.html"
+  },
+  "permissions": [
+    {
+      "capability": "lan.transfer"
+    }
+  ]
+}

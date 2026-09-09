@@ -17,13 +17,17 @@
     "@doujiao/plugin-sdk": "*",
     "@electron-toolkit/utils": "^3.0.0",
     "@marsaud/smb2": "^0.18.0",
+    "busboy": "^1.6.0",
     "electron-log": "^5.2.0",
     "electron-store": "^10.0.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/busboy": "^1.5.4",
     "@types/node": "^22.10.5",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

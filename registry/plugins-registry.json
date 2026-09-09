@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 17,
-  "updatedAt": "2026-09-09T14:19:23.933Z",
+  "registryVersion": 19,
+  "updatedAt": "2026-09-09T14:39:52.327Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -319,6 +319,40 @@
               "size": 60612,
               "sha256": "ba3a2ebbb94be6ea65f0d507468e96af75211ca320097df56b8dcc5b96393446",
               "signature": "ZslGqMxyB7YzHWOAUmQWOyFdfnGOVNHsT2Ht+SZUyHK9Ed8H+tqfCQlNWJgnp0EPH30hQ301uPFbQ70cWD1aBQ=="
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lan-transfer",
+      "publisher": "doujiao-official",
+      "name": "局域网快传",
+      "description": "局域网跨设备文件传输助手：电脑与手机双向互传、手机扫码免装 App 秒连、大文件流式秒传、局域网文本与剪贴板极速同步",
+      "icon": "⚡",
+      "releases": [
+        {
+          "version": "1.0.0",
+          "channel": "stable",
+          "publishedAt": "2026-09-09T14:39:52.327Z",
+          "changelog": "官方发布版本 v1.0.0",
+          "engines": {
+            "doujiao": ">=0.2.0 <0.3.0",
+            "pluginApi": "^1.0.0"
+          },
+          "permissions": [
+            {
+              "capability": "lan.transfer"
+            }
+          ],
+          "artifacts": [
+            {
+              "platform": "any",
+              "arch": "any",
+              "url": "https://github.com/newbee7955/doujiao/releases/download/lan-transfer-v1.0.0/lan-transfer-v1.0.0.zip",
+              "size": 57552,
+              "sha256": "bda606650306a1c08751297d49b21739d5add79abf1af10cced5767b49cbb808",
+              "signature": "awWrAUy7jZVUdWAp1n8HLDarcVPahPABde/SDHZqiDC8/nIUfm89/9EXzATsgmEGky3najzl9cC8p3G5tk+ADw=="
             }
           ]
         }

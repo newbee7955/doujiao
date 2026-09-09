@@ -9,6 +9,7 @@ import {
 } from '../auth/douyin-auth'
 import { ClipboardHistoryService } from '../services/clipboard-service'
 import { SambaService } from '../services/samba-service'
+import { LanTransferService } from '../services/lan-transfer-service'
 import type { NetworkRequestOptions, DownloadTaskRequest } from '@doujiao/plugin-sdk'
 
 /**
@@ -325,6 +326,118 @@ export function registerPluginIpcBridge(): void {
     for (const [, instance] of (containerManager as any).views.entries()) {
       if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
         instance.view.webContents.send('plugin:samba:transfer-progress', progress)
+      }
+    }
+  })
+
+  // ==========================================
+  // 9. 局域网跨设备互传能力 (需要 lan.transfer 权限)
+  // ==========================================
+  const lanService = LanTransferService.getInstance()
+
+  const checkLanPermission = async (senderId: number): Promise<string> => {
+    const pluginId = containerManager.getPluginIdByWebContentsId(senderId)
+    if (!pluginId) throw new Error('[Security] 未经授权的调用来源')
+    const { PluginManager } = await import('../plugins/plugin-manager')
+    const plugin = PluginManager.getInstance().getPlugin(pluginId)
+    const hasPermission = plugin?.manifest?.permissions?.some(
+      (p: any) => p.capability === 'lan.transfer'
+    )
+    if (!hasPermission) {
+      throw new Error(`[Security] 插件 ${pluginId} 未在 manifest.json 中声明 lan.transfer 权限，拒绝调用`)
+    }
+    return pluginId
+  }
+
+  ipcMain.handle('plugin:lan:start-server', async (event, options?: any) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.startServer(options)
+  })
+
+  ipcMain.handle('plugin:lan:stop-server', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.stopServer()
+  })
+
+  ipcMain.handle('plugin:lan:get-status', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.getStatus()
+  })
+
+  ipcMain.handle('plugin:lan:switch-ip', async (event, ip: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.switchIp(ip)
+  })
+
+  ipcMain.handle('plugin:lan:add-share-files', async (event, filePaths: string[]) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.addShareFiles(filePaths)
+  })
+
+  ipcMain.handle('plugin:lan:remove-share-file', async (event, id: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.removeShareFile(id)
+  })
+
+  ipcMain.handle('plugin:lan:get-share-files', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.getShareFiles()
+  })
+
+  ipcMain.handle('plugin:lan:get-received-files', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.getReceivedFiles()
+  })
+
+  ipcMain.handle('plugin:lan:delete-received-file', async (event, id: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.deleteReceivedFile(id)
+  })
+
+  ipcMain.handle('plugin:lan:open-file', async (event, localPath: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.openFile(localPath)
+  })
+
+  ipcMain.handle('plugin:lan:show-item-in-folder', async (event, localPath: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.showItemInFolder(localPath)
+  })
+
+  ipcMain.handle('plugin:lan:select-files-to-send', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.selectFilesToSend()
+  })
+
+  ipcMain.handle('plugin:lan:select-save-directory', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.selectSaveDirectory()
+  })
+
+  ipcMain.handle('plugin:lan:open-save-directory', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.openSaveDirectory()
+  })
+
+  ipcMain.handle('plugin:lan:send-text-message', async (event, text: string) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.sendTextMessage(text)
+  })
+
+  ipcMain.handle('plugin:lan:get-messages', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.getMessages()
+  })
+
+  ipcMain.handle('plugin:lan:clear-messages', async (event) => {
+    await checkLanPermission(event.sender.id)
+    return lanService.clearMessages()
+  })
+
+  lanService.on('lan-event', (event) => {
+    for (const [, instance] of (containerManager as any).views.entries()) {
+      if (instance.isAttached && !instance.view.webContents.isDestroyed()) {
+        instance.view.webContents.send('plugin:lan:event', event)
       }
     }
   })

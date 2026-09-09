@@ -132,6 +132,39 @@ const sdk: DoujiaoSDK = {
     }
   },
 
+  lan: {
+    startServer: (options?: any) => ipcRenderer.invoke('plugin:lan:start-server', options),
+    stopServer: () => ipcRenderer.invoke('plugin:lan:stop-server'),
+    getStatus: () => ipcRenderer.invoke('plugin:lan:get-status'),
+    switchIp: (ip: string) => ipcRenderer.invoke('plugin:lan:switch-ip', ip),
+    addShareFiles: (filePaths: string[]) => ipcRenderer.invoke('plugin:lan:add-share-files', filePaths),
+    removeShareFile: (id: string) => ipcRenderer.invoke('plugin:lan:remove-share-file', id),
+    getShareFiles: () => ipcRenderer.invoke('plugin:lan:get-share-files'),
+    getReceivedFiles: () => ipcRenderer.invoke('plugin:lan:get-received-files'),
+    deleteReceivedFile: (id: string) => ipcRenderer.invoke('plugin:lan:delete-received-file', id),
+    openFile: (localPath: string) => ipcRenderer.invoke('plugin:lan:open-file', localPath),
+    showItemInFolder: (localPath: string) => ipcRenderer.invoke('plugin:lan:show-item-in-folder', localPath),
+    selectFilesToSend: () => ipcRenderer.invoke('plugin:lan:select-files-to-send'),
+    selectSaveDirectory: () => ipcRenderer.invoke('plugin:lan:select-save-directory'),
+    openSaveDirectory: () => ipcRenderer.invoke('plugin:lan:open-save-directory'),
+    sendTextMessage: (text: string) => ipcRenderer.invoke('plugin:lan:send-text-message', text),
+    getMessages: () => ipcRenderer.invoke('plugin:lan:get-messages'),
+    clearMessages: () => ipcRenderer.invoke('plugin:lan:clear-messages'),
+    onEvent: (callback: (event: any) => void) => {
+      const handler = (_: any, event: any) => {
+        try {
+          callback(event)
+        } catch (err) {
+          console.error('[DoujiaoSDK] 局域网传输事件监听回调异常:', err)
+        }
+      }
+      ipcRenderer.on('plugin:lan:event', handler)
+      return () => {
+        ipcRenderer.removeListener('plugin:lan:event', handler)
+      }
+    }
+  },
+
   ui: {
     notify: (options) => {
       console.log(`[PluginToast] [${options.type || 'info'}] ${options.message}`)

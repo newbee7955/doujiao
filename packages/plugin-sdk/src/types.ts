@@ -10,6 +10,7 @@ export type CapabilityType =
   | 'media.merge'
   | 'clipboard.history'
   | 'samba.client'
+  | 'lan.transfer'
   | 'ui.dialog';
 
 export interface NetworkCapability {
@@ -40,6 +41,10 @@ export interface SambaCapability {
   capability: 'samba.client';
 }
 
+export interface LanTransferCapability {
+  capability: 'lan.transfer';
+}
+
 export type PluginCapability =
   | NetworkCapability
   | DownloadCapability
@@ -47,6 +52,7 @@ export type PluginCapability =
   | MediaMergeCapability
   | ClipboardCapability
   | SambaCapability
+  | LanTransferCapability
   | { capability: CapabilityType; [key: string]: any };
 
 export interface SambaConfig {
@@ -175,6 +181,57 @@ export interface PluginLifecycle {
   dispose?(): void;
 }
 
+export interface LanTransferServerStatus {
+  running: boolean;
+  port: number;
+  ip: string;
+  allIps: Array<{ name: string; ip: string; isDefault: boolean }>;
+  url: string;
+  qrCodeSvg: string;
+  connectedDevices: Array<{ id: string; deviceName: string; ip: string; lastSeen: number }>;
+  saveDirectory: string;
+}
+
+export interface LanTransferSharedFile {
+  id: string;
+  name: string;
+  size: number;
+  localPath: string;
+  mimeType: string;
+  downloadCount: number;
+  createdAt: number;
+}
+
+export interface LanTransferReceivedFile {
+  id: string;
+  name: string;
+  size: number;
+  localPath: string;
+  mimeType: string;
+  senderDevice: string;
+  senderIp: string;
+  receivedAt: number;
+}
+
+export interface LanTransferMessage {
+  id: string;
+  text: string;
+  sender: 'pc' | 'mobile';
+  senderDevice?: string;
+  timestamp: number;
+}
+
+export interface LanTransferEvent {
+  type:
+    | 'file-received'
+    | 'message-received'
+    | 'device-connected'
+    | 'share-downloaded'
+    | 'upload-progress'
+    | 'server-status';
+  payload: any;
+}
+
 /**
  * 宿主向沙箱环境注入的 SDK 核心门面
  */
@@ -235,6 +292,28 @@ export interface DoujiaoSDK {
     selectLocalFile(): Promise<{ canceled: boolean; filePath?: string; fileName?: string; size?: number }>;
     selectLocalDirectory(): Promise<{ canceled: boolean; directoryPath?: string }>;
     onTransferProgress(callback: (progress: SambaTransferProgress) => void): () => void;
+  };
+
+  /** 局域网跨设备文件传输助手 (PC与手机互传) */
+  lan?: {
+    startServer(options?: { port?: number; ip?: string; saveDirectory?: string }): Promise<LanTransferServerStatus>;
+    stopServer(): Promise<boolean>;
+    getStatus(): Promise<LanTransferServerStatus>;
+    switchIp(ip: string): Promise<LanTransferServerStatus>;
+    addShareFiles(filePaths: string[]): Promise<LanTransferSharedFile[]>;
+    removeShareFile(id: string): Promise<boolean>;
+    getShareFiles(): Promise<LanTransferSharedFile[]>;
+    getReceivedFiles(): Promise<LanTransferReceivedFile[]>;
+    deleteReceivedFile(id: string): Promise<boolean>;
+    openFile(localPath: string): Promise<boolean>;
+    showItemInFolder(localPath: string): Promise<boolean>;
+    selectFilesToSend(): Promise<{ canceled: boolean; filePaths: string[] }>;
+    selectSaveDirectory(): Promise<{ canceled: boolean; directoryPath?: string }>;
+    openSaveDirectory(): Promise<void>;
+    sendTextMessage(text: string): Promise<LanTransferMessage>;
+    getMessages(): Promise<LanTransferMessage[]>;
+    clearMessages(): Promise<boolean>;
+    onEvent(callback: (event: LanTransferEvent) => void): () => void;
   };
 
   /** UI 交互与通知 */
