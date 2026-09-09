@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "registryVersion": 16,
-  "updatedAt": "2026-09-09T11:18:42.342Z",
+  "registryVersion": 17,
+  "updatedAt": "2026-09-09T14:19:23.933Z",
   "plugins": [
     {
       "id": "douyin-downloader",
@@ -297,7 +297,7 @@
         {
           "version": "1.0.0",
           "channel": "stable",
-          "publishedAt": "2026-09-09T11:18:42.342Z",
+          "publishedAt": "2026-09-09T14:19:23.933Z",
           "changelog": "官方发布版本 v1.0.0",
           "engines": {
             "doujiao": ">=0.2.0 <0.3.0",
@@ -316,9 +316,9 @@
               "platform": "any",
               "arch": "any",
               "url": "https://github.com/newbee7955/doujiao/releases/download/samba-manager-v1.0.0/samba-manager-v1.0.0.zip",
-              "size": 60162,
-              "sha256": "f9318cb8b6c6379e4440b253b4ebb8dd3173402d6aafa0b38e31b31f0f213da3",
-              "signature": "wH48pyF30OpinLVpyVBQX7YT0mPMszOjUpk5vu847Zyu4nhBSgULMMpa+1OSxqEnXwuhjseXoN0EeuX14ASQAQ=="
+              "size": 60612,
+              "sha256": "ba3a2ebbb94be6ea65f0d507468e96af75211ca320097df56b8dcc5b96393446",
+              "signature": "ZslGqMxyB7YzHWOAUmQWOyFdfnGOVNHsT2Ht+SZUyHK9Ed8H+tqfCQlNWJgnp0EPH30hQ301uPFbQ70cWD1aBQ=="
             }
           ]
         }

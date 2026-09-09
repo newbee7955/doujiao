@@ -380,6 +380,17 @@ export default function App(): JSX.Element {
   // 测试连接
   const handleTestConnection = async () => {
     if (!sdk) return
+    if (!formConfig.host || !formConfig.host.trim()) {
+      setTestResult({ success: false, error: '请填写主机 / IP 地址！' })
+      return
+    }
+    if (!formConfig.share || !formConfig.share.trim()) {
+      setTestResult({
+        success: false,
+        error: '请务必填写「共享路径 (Share Name)」！\nSamba 协议必须挂载具体的共享文件夹（例如: public, data, video 等，可在您的 NAS 共享文件夹列表中查看）。'
+      })
+      return
+    }
     setTestResult({ testing: true })
     try {
       const res = await sdk.testConnection(formConfig)
@@ -392,15 +403,25 @@ export default function App(): JSX.Element {
   // 保存连接配置
   const handleSaveProfile = async () => {
     if (!sdk) return
-    if (!formConfig.host || !formConfig.share) {
-      alert('请填写服务器主机与共享路径！')
+    if (!formConfig.host || !formConfig.host.trim()) {
+      alert('请填写服务器主机或 IP 地址！')
+      return
+    }
+    if (!formConfig.share || !formConfig.share.trim()) {
+      alert('请填写共享路径 (Share Name)，例如: public, data 等！')
       return
     }
 
     const profile: SambaProfile = {
       id: editingProfile ? editingProfile.id : `samba_${Date.now()}`,
       name: formProfileName.trim() || `${formConfig.host}/${formConfig.share}`,
-      config: { ...formConfig },
+      config: {
+        ...formConfig,
+        host: formConfig.host.trim(),
+        share: formConfig.share.trim(),
+        username: (formConfig.username || '').trim(),
+        domain: (formConfig.domain || '').trim()
+      },
       createdAt: editingProfile ? editingProfile.createdAt : Date.now(),
       lastConnected: editingProfile?.lastConnected
     }
@@ -439,13 +460,13 @@ export default function App(): JSX.Element {
     setEditingProfile(null)
     setFormProfileName('家庭 NAS')
     setFormConfig({
-      host: '192.168.1.100',
+      host: '',
       port: 445,
-      share: 'share',
+      share: '',
       basePath: '',
       username: '',
       password: '',
-      domain: 'WORKGROUP'
+      domain: ''
     })
     setTestResult(null)
     setShowProfileModal(true)
@@ -1056,6 +1077,9 @@ export default function App(): JSX.Element {
                     onChange={(e) => setFormConfig({ ...formConfig, share: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
+                  <div className="text-[10px] text-amber-400 mt-1">
+                    * 必填：Samba 协议必须挂载具体共享路径（如 public, data 等）
+                  </div>
                 </div>
                 <div>
                   <label className="block text-slate-400 mb-1">起始子路径 (可选)</label>
@@ -1066,6 +1090,9 @@ export default function App(): JSX.Element {
                     onChange={(e) => setFormConfig({ ...formConfig, basePath: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono focus:outline-none focus:border-emerald-500"
                   />
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    挂载成功后默认进入的子目录，留空即为根目录
+                  </div>
                 </div>
               </div>
 
@@ -1096,17 +1123,20 @@ export default function App(): JSX.Element {
                 <label className="block text-slate-400 mb-1">工作组 / 域 (可选)</label>
                 <input
                   type="text"
-                  placeholder="默认 WORKGROUP"
+                  placeholder="Linux/NAS 本地账户请留空；域账户填入 DOMAIN"
                   value={formConfig.domain || ''}
                   onChange={(e) => setFormConfig({ ...formConfig, domain: e.target.value })}
                   className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white font-mono focus:outline-none focus:border-emerald-500"
                 />
+                <div className="text-[10px] text-slate-500 mt-1">
+                  注意：群晖/威联通/Linux Samba 等本地用户切勿填 WORKGROUP，请保持留空
+                </div>
               </div>
 
               {/* 测试连接反馈 */}
               {testResult && (
                 <div
-                  className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  className={`p-3 rounded-xl text-xs flex items-start gap-2.5 ${
                     testResult.testing
                       ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
                       : testResult.success
@@ -1114,14 +1144,14 @@ export default function App(): JSX.Element {
                       : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
                   }`}
                 >
-                  <span>{testResult.testing ? '⏳' : testResult.success ? '✅' : '❌'}</span>
-                  <span>
+                  <span className="mt-0.5">{testResult.testing ? '⏳' : testResult.success ? '✅' : '❌'}</span>
+                  <div className="flex-1 whitespace-pre-line text-left leading-relaxed font-sans">
                     {testResult.testing
-                      ? '正在测试连接中...'
+                      ? '正在发起 Samba NTLMv2 协议握手测试中...'
                       : testResult.success
-                      ? '连接测试成功！Samba 服务正常响应。'
+                      ? '连接测试成功！Samba 服务正常响应，凭证有效。'
                       : `连接测试失败: ${testResult.error}`}
-                  </span>
+                  </div>
                 </div>
               )}
             </div>

@@ -11,6 +11,7 @@ import type {
   SambaTransferProgress
 } from '@doujiao/plugin-sdk'
 import { FFmpegManager } from '../media/ffmpeg-manager'
+import { patchSmb2WithNtlmV2 } from './ntlm-v2'
 
 interface ActiveClient {
   client: any
@@ -120,13 +121,28 @@ export class SambaService {
 
   // --- 客户端实例获取与连接测试 ---
   private createClient(config: SambaConfig): any {
-    const cleanShare = config.share.replace(/^\\+/, '').replace(/\\+$/, '').replace(/\//g, '')
-    const shareUrl = `\\\\${config.host}\\${cleanShare}`
+    patchSmb2WithNtlmV2()
+
+    if (!config.host || !config.host.trim()) {
+      throw new Error('请填写 Samba 服务器主机或 IP 地址')
+    }
+
+    const cleanShare = (config.share || '')
+      .replace(/^\\+/, '')
+      .replace(/\\+$/, '')
+      .replace(/\//g, '')
+      .trim()
+
+    if (!cleanShare) {
+      throw new Error('必须指定共享路径 (Share Name)，例如: public, data, video 等（Samba 协议必须挂载具体共享路径）')
+    }
+
+    const shareUrl = `\\\\${config.host.trim()}\\${cleanShare}`
     return new SMB2({
       share: shareUrl,
       port: config.port ? Number(config.port) : 445,
-      domain: config.domain || config.workgroup || 'WORKGROUP',
-      username: config.username || '',
+      domain: (config.domain || config.workgroup || '').trim(),
+      username: (config.username || '').trim(),
       password: config.password || '',
       autoCloseTimeout: 0
     })
@@ -145,7 +161,18 @@ export class SambaService {
       })
       return { success: true }
     } catch (err: any) {
-      return { success: false, error: err?.message || String(err) }
+      let errMsg = err?.message || String(err)
+      if (errMsg.includes('STATUS_LOGON_FAILURE') || errMsg.includes('0xC000006D')) {
+        errMsg =
+          '账号或密码鉴权失败 (STATUS_LOGON_FAILURE)。请排查：\n' +
+          '1. 用户名与密码是否完全正确（Linux/Samba 区分大小写）；\n' +
+          '2. 必须填写正确的「共享路径 (Share Name)」且该用户具备该文件夹访问权限；\n' +
+          '3. 若为群晖/威联通/Linux 等本地账户，请将「工作组 / 域」留空（切勿填入 WORKGROUP）；\n' +
+          '4. 服务端是否启用了该用户的 Samba 登录许可。'
+      } else if (errMsg.includes('STATUS_BAD_NETWORK_NAME')) {
+        errMsg = '未找到指定的共享文件夹 (STATUS_BAD_NETWORK_NAME)。请确认共享路径 (Share Name) 与 NAS 上的共享文件夹名称一致。'
+      }
+      return { success: false, error: errMsg }
     } finally {
       if (client) {
         try {
